@@ -134,19 +134,12 @@ TYPES : BEGIN OF zbp_upload,
           erdat       TYPE sy-datum,
           uname       TYPE sy-uname,
         END OF zbp_upload.
-*data: t_log type table of zbp_upload, "TY_LOG,
 DATA: t_log    TYPE TABLE OF zbp_upload, "TY_LOG,
       w_log    TYPE zbp_upload,
-**      Insert by sruthy
-*      t_cust       TYPE TABLE OF zcust_map,
-*      w_cust       TYPE zcust_map,
-*      wa_zcust_map TYPE zcust_map,
       it_kna1n TYPE TABLE OF kna1,
       wa_kna1n TYPE kna1,
       it_knb1n TYPE TABLE OF knb1,
       wa_knb1n TYPE knb1.
-**End of insert
-*FIELD-SYMBOLS : <f> TYPE  any.
 DATA:it_but000 TYPE TABLE OF but000,
      wa_but000 TYPE but000.
 DATA: it_cvi_cust_link TYPE TABLE OF cvi_cust_link,
@@ -167,14 +160,12 @@ DATA : gwa_knvi TYPE knvi.
 
 DATA: BEGIN OF bdcdata OCCURS 0.
         INCLUDE STRUCTURE bdcdata.
-*  include STRUCTURE bdcrecx1.
 DATA: END OF bdcdata.
 DATA : lv_flag TYPE c.
 DATA lv_string TYPE string.
 
 SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE TEXT-101.
   PARAMETERS: p_infile LIKE rlgrap-filename  ,        "File Path
-*              head(5)  default '1' obligatory, "Header Rows
               v_mode   TYPE ctu_params-dismode DEFAULT 'A' NO-DISPLAY.
 SELECTION-SCREEN END OF BLOCK b1.
 
@@ -191,35 +182,6 @@ START-OF-SELECTION.
 
   PERFORM upload_xl.
   PERFORM fill_fcat_bplog.
-*BREAK-POINT.
-*select kunnr name1 sortl name4
-*from kna1
-*into table lt_kna1
-*for all entries in it_file
-*where name1 eq it_file-name1.
-*where name1 eq it_file-name1 AND
-*      name4 eq it_file-name4.
-
-*select kunnr name1 sortl name4
-
-*  SELECT * FROM kna1  INTO TABLE  it_kna1n." FOR ALL ENTRIES IN it_file WHERE  name1 = it_file-name1." AND name3 = it_file-name3.
-*  IF it_kna1n IS NOT INITIAL.
-*    SELECT * FROM knb1  INTO TABLE it_knb1n FOR ALL ENTRIES IN it_kna1n WHERE kunnr = it_kna1n-kunnr.
-*  ENDIF.
-*  SELECT kunnr name1 sortl name4
-*  FROM kna1
-*  APPENDING TABLE lt_kna1
-*  FOR ALL ENTRIES IN it_file
-*  WHERE name1 = it_file-name4.
-
-*  BREAK abaper.
-
-*select kunnr name1 sortl
-*from kna1
-*appending table lt_kna1
-*for all entries in it_file
-*where sortl eq it_file-headoffice.
-
   PERFORM create_bp_add_role.
   PERFORM display_log_bp.
 *&---------------------------------------------------------------------*
@@ -232,36 +194,13 @@ START-OF-SELECTION.
 *&---------------------------------------------------------------------*
 FORM upload_xl .
 
-*  call function 'F4_FILENAME'
-*    exporting
-*      program_name  = syst-cprog
-*      dynpro_number = syst-dynnr
-*      field_name    = 'p_file'
-*    importing
-*      file_name     = p_infile.
   DATA lt_raw_data  TYPE truxs_t_text_data.
-
-*  BREAK abaper.
-*
-*  CALL FUNCTION 'TEXT_CONVERT_XLS_TO_SAP'
-*    EXPORTING
-**     I_FIELD_SEPERATOR    =
-*      i_line_header        = 'X'
-*      i_tab_raw_data       = lt_raw_data
-*      i_filename           = p_infile
-*    TABLES
-*      i_tab_converted_data = itab1
-**     i_tab_converted_data = t_upload[]
-*    EXCEPTIONS
-*      conversion_failed    = 1
-*      OTHERS               = 2.
 
   CALL FUNCTION 'ALSM_EXCEL_TO_INTERNAL_TABLE'
     EXPORTING
       filename                = p_infile
       i_begin_col             = '1'
       i_begin_row             = '2' "Do not require
-*headings
       i_end_col               = '100'
       i_end_row               = '10000'
     TABLES
@@ -272,7 +211,6 @@ FORM upload_xl .
       OTHERS                  = 3.
   IF sy-subrc <> 0.
     MESSAGE e010(zz) WITH TEXT-001. "Problem uploading
-*Excel Spreadsheet
   ENDIF.
 
   LOOP AT itab1 ASSIGNING <fs_xl>.
@@ -339,12 +277,8 @@ FORM fill_fcat_bplog .
   w_fcat-seltext_l = 'Customer No'.
   APPEND w_fcat TO t_fcat.
   CLEAR w_fcat.
-
-*  w_fcat-fieldname = 'sterm2'.
-*  w_fcat-tabname = 'T_LOG'.
-*  w_fcat-seltext_l = 'Search Term 2'.
-*  APPEND w_fcat TO t_fcat.
 ENDFORM.
+
 *&---------------------------------------------------------------------*
 *& Form CREATE_BP_ADD_ROLE
 *&---------------------------------------------------------------------*
@@ -366,33 +300,11 @@ FORM create_bp_add_role .
     PERFORM call_bapi_bupa_create USING wa_file CHANGING lv_error.
     IF businesspartner IS NOT INITIAL AND lv_error IS INITIAL.
       PERFORM add_role_bp.
-** Start of insert by  Sruthy  - 25/06/2022
       IF lv_flag = 'X'.
         SELECT SINGLE * FROM kna1 INTO @DATA(wa_kna1) WHERE kunnr = @businesspartner.
-*        LOOP AT t_cust ASSIGNING FIELD-SYMBOL(<f>) WHERE kunnr = businesspartner.
-**              <f>-name1 = wa_kna1-name1.
-*          <f>-zb2bid = wa_kna1-name3.
-*        ENDLOOP.
-*        SELECT * FROM zcust_map
-*          INTO TABLE @DATA(it_zcust_map)
-*          FOR ALL ENTRIES IN @t_cust
-*          WHERE  zb2bid = @t_cust-zb2bid
-*        AND bukrs = @t_cust-bukrs.
-*          AND name1 = @t_cust-name1.
-*        LOOP AT t_cust INTO w_cust.
-*          READ TABLE it_zcust_map INTO wa_zcust_map WITH KEY bukrs = w_cust-bukrs zb2bid = w_cust-zb2bid." name1 = w_cust-name1.
-*          IF sy-subrc IS NOT INITIAL.
-*            MODIFY zcust_map FROM w_cust.
-*          ENDIF.
-*          CLEAR : w_cust,lv_flag.
-*        ENDLOOP.
-*            MODify zcust_map FROM TABLE t_cust.
-
       ENDIF.
-**End of insert
     ENDIF.
     PERFORM maintain_customer_s.
-*    perform maintain_vendor_s.
   ENDLOOP.
 
 ENDFORM.
@@ -413,9 +325,6 @@ FORM display_log_bp .
       it_fieldcat  = t_fcat
     TABLES
       t_outtab     = t_log
-* EXCEPTIONS
-*     PROGRAM_ERROR                     = 1
-*     OTHERS       = 2
     .
   IF sy-subrc <> 0.
 * Implement suitable error handling here
@@ -548,41 +457,9 @@ FORM call_bapi_bupa_create  USING    p_wa_file
   CLEAR: lv_error, w_log.
 
   lv_bp =  wa_file-sterm2.
-*  if wa_file-headoffice is not initial.
-*    read table lt_kna1 into lwa_kna1 with key sortl = wa_file-headoffice.
-*    if sy-subrc eq 0.
-*      headoffice = lwa_kna1-kunnr.
-*    else.
-*      clear: headoffice.
-*    endif.
-*  else.
-*    clear: headoffice.
-*  endif.
-
-*  clear lwa_kna1.
-*  read table lt_kna1 into lwa_kna1 with key name1 = wa_file-name1.
-*  if sy-subrc eq 0.
-*    businesspartner = lwa_kna1-kunnr.
-*    v_exist = 'X'.
-*  else.
-*  break abaper.
   CLEAR lwa_kna1.
-*    read table lt_kna1 into lwa_kna1 with key  name4 = wa_file-name4.
-*    read table lt_kna1 into lwa_kna1 with key bukrs = wa_file-bukrs name1 = wa_file-name1 name3 = wa_file-name3.
   CLEAR : v_exist.
-*    READ TABLE it_kna1n INTO wa_kna1n WITH KEY  name1 = wa_file-name1 name3 = wa_file-name3.
-*    READ TABLE it_kna1n INTO wa_kna1n WITH KEY  name3 = wa_file-name3.
   CLEAR : wa_kna1n , wa_knb1n,lv_flag1.
-  "Commented on 08/11/2024 for same name
-*  LOOP AT it_kna1n INTO wa_kna1n WHERE name3 = wa_file-name3.
-**    IF SY-SUBRC IS INITIAL.
-*    READ TABLE it_knb1n INTO wa_knb1n WITH KEY kunnr = wa_kna1n-kunnr bukrs = wa_file-bukrs.
-*    IF  sy-subrc IS INITIAL.
-*      lv_flag1 = 'X'.
-*      EXIT.
-*    ENDIF.
-*  ENDLOOP.
-*    if sy-subrc eq 0.
   CLEAR lv_flag1.
   SELECT SINGLE kunnr
     FROM kna1
@@ -592,8 +469,6 @@ FORM call_bapi_bupa_create  USING    p_wa_file
     lv_flag1 = 'X'.
   ENDIF.
   IF lv_flag1 = 'X'.
-*      businesspartner = lwa_kna1-kunnr.
-*    businesspartner = wa_knb1n-kunnr.
     businesspartner = lv_kunnr_check.
     v_exist = 'X'.
     lv_string = businesspartner.
@@ -607,7 +482,6 @@ FORM call_bapi_bupa_create  USING    p_wa_file
     businesspartnerextern-externaladdressnumber = wa_file-extaddressnumber.
     CALL FUNCTION 'BAPI_BUPA_CREATE_FROM_DATA'
       EXPORTING
-*       businesspartnerextern   = businesspartnerextern
         partnercategory         = partnercategory
         partnergroup            = partnergroup
         centraldata             = centraldata
@@ -622,7 +496,6 @@ FORM call_bapi_bupa_create  USING    p_wa_file
         e_maildata              = it_maildata
         addressnotes            = it_remark
         return                  = return.
-*      BREAK-POINT.
     LOOP AT return INTO lwa_return .
       w_log-sortl = lv_bp.
       w_log-bu_partnerx = 'B'.
@@ -633,30 +506,21 @@ FORM call_bapi_bupa_create  USING    p_wa_file
       w_log-erdat = sy-datum.
       w_log-uname = sy-uname.
       APPEND w_log TO t_log.
-*      INSERT zbp_upload FROM w_log.
       CLEAR w_log.
       IF lwa_return-type = 'E'.
         lv_error = 'X'.
       ENDIF.
-*        lv_error = abap_true.
     ENDLOOP.
 
     IF lv_error IS NOT INITIAL.
       ROLLBACK WORK.
     ENDIF.
-*      BREAK-POINT.
     IF  businesspartner IS NOT INITIAL .
       IF lv_error IS INITIAL.
         CALL FUNCTION 'BAPI_TRANSACTION_COMMIT'
           EXPORTING
             wait = 'X'.
-**Start of insert - Sruthy 25/06/2022
         lv_flag = 'X'.
-*        w_cust-kunnr = businesspartner.
-*        w_cust-bukrs  = wa_file-bukrs.
-*        APPEND w_cust TO t_cust.
-*        CLEAR : w_cust.
-**      End of insert
       ENDIF.
 
     ENDIF.
@@ -687,16 +551,9 @@ FORM call_bapi_bupa_create  USING    p_wa_file
     ENDIF.
 
     APPEND w_log TO t_log.
-*    INSERT zbp_upload FROM w_log.
     CLEAR w_log.
 
   ENDIF.
-*    endif.  "Commeted by Sruthy
-*  endif.
-
-*  IF businesspartnerextern IS NOT INITIAL.
-*    businesspartner =  businesspartnerextern.
-*  ENDIF.
 
 ENDFORM.
 *&---------------------------------------------------------------------*
@@ -718,12 +575,8 @@ FORM add_role_bp .
 *&---------------------------------------------------------------------*
 *&
 *&---------------------------------------------------------------------*
-*BREAK-POINT.
-*  IF wa_file-role1 IS NOT INITIAL.
+
   DATA : lv_rltyp TYPE but100-rltyp.
-
-*    break abaper.
-
   businesspartnerrole = 'FLCU00'.
   CALL FUNCTION 'BAPI_BUPA_ROLE_ADD_2'
     EXPORTING
@@ -738,7 +591,6 @@ FORM add_role_bp .
   CALL FUNCTION 'BAPI_TRANSACTION_COMMIT'
     EXPORTING
       wait = 'X'.
-*    BREAK-POINT.
   CLEAR lv_rltyp.
   SELECT SINGLE rltyp INTO lv_rltyp FROM but100 WHERE partner = businesspartner
   AND rltyp = 'FLCU00'.
@@ -747,13 +599,11 @@ FORM add_role_bp .
     WAIT UP TO 1 SECONDS.
   ENDIF.
 
-*  ENDIF.
-
 *&---------------------------------------------------------------------*
 *&    Add Customer Roles
 *&---------------------------------------------------------------------*
 
-*  if wa_file-role2 is not initial.
+
   businesspartnerrole = 'FLCU01'.
   CALL FUNCTION 'BAPI_BUPA_ROLE_ADD_2'
     EXPORTING
@@ -768,7 +618,6 @@ FORM add_role_bp .
   CALL FUNCTION 'BAPI_TRANSACTION_COMMIT'
     EXPORTING
       wait = 'X'.
-*    BREAK-POINT.
   CLEAR lv_rltyp.
   SELECT SINGLE rltyp INTO lv_rltyp FROM but100 WHERE partner = businesspartner
   AND rltyp = 'FLCU01'.
@@ -776,29 +625,6 @@ FORM add_role_bp .
   IF lv_rltyp IS INITIAL.
     WAIT UP TO 1 SECONDS.
   ENDIF.
-
-*  businesspartnerrole = 'ZCUST'.
-*  CALL FUNCTION 'BAPI_BUPA_ROLE_ADD_2'
-*    EXPORTING
-*      businesspartner             = businesspartner
-*      businesspartnerrolecategory = businesspartnerrolecategory
-*      all_businesspartnerroles    = ' '
-*      businesspartnerrole         = businesspartnerrole
-*      differentiationtypevalue    = differentiationtypevalue
-*      validuntildate              = '99991231'
-*    TABLES
-*      return                      = return.
-*  CALL FUNCTION 'BAPI_TRANSACTION_COMMIT'
-*    EXPORTING
-*      wait = 'X'.
-*
-*  CLEAR lv_rltyp.
-*  SELECT SINGLE rltyp INTO lv_rltyp FROM but100 WHERE partner = businesspartner
-*                                                  AND rltyp = 'ZCUST'.
-*
-*  IF lv_rltyp IS INITIAL.
-*    WAIT UP TO 1 SECONDS.
-*  ENDIF.
 
   businesspartnerrole = 'UKM000'.
   CALL FUNCTION 'BAPI_BUPA_ROLE_ADD_2'
@@ -822,8 +648,6 @@ FORM add_role_bp .
   IF lv_rltyp IS INITIAL.
     WAIT UP TO 1 SECONDS.
   ENDIF.
-
-*  endif.
 
   SELECT *  FROM but000  INTO TABLE it_but000 WHERE partner = businesspartner.
 
@@ -935,9 +759,6 @@ FORM maintain_customer_s .
     lv_partner      TYPE bu_partner,
     lv_credit_sgmnt TYPE ukm_credit_sgmnt.
 
-*  DATA : wa_bp_credit_sgm TYPE ukm_s_bp_cms_sgm.
-
-*   Clear the work area initially.
   REFRESH lt_tax_data.
   REFRESH is_master_data-customers.
   REFRESH lt_customers[].
@@ -968,8 +789,6 @@ FORM maintain_customer_s .
   CLEAR kna1.
   SELECT SINGLE * FROM kna1 WHERE kunnr = ls_customers-header-object_instance-kunnr.
   IF sy-subrc = 0.
-*    kna1-j_1ipanno = wa_file-pan.
-*    update kna1.
     UPDATE kna1
     SET j_1ipanno = @wa_file-pan,
             kukla = @wa_file-kukla,
@@ -987,16 +806,11 @@ FORM maintain_customer_s .
   ls_address-task                      = 'U'.
   ls_customers-central_data-address = ls_address.
 
-
-
-
-*  ls_customers-central_data-address-remark-remarks = it_remarkx[].
-
   ls_sales-task = 'I'.
   ls_sales-data_key-vkorg = wa_file-vkorg.
   ls_sales-data_key-vtweg = wa_file-vtweg.
   ls_sales-data_key-spart = wa_file-spart.
-*  ls_sales-data-bzirk = wa_file-bzirk.
+
   ls_sales-data-inco1 = wa_file-inco1.
   ls_sales-data-inco2 = wa_file-inco2.
   ls_sales-data-kdgrp = wa_file-kdgrp.
@@ -1005,57 +819,31 @@ FORM maintain_customer_s .
   ls_sales-data-vkbur = wa_file-vkbur.
   ls_sales-data-vkgrp = wa_file-vkgrp.
   ls_sales-data-waers = wa_file-waers.
-*  ls_sales-data-konda = wa_file-konda.
   ls_sales-data-kalks = wa_file-kalks.
   ls_sales-data-versg = '1'.
-*  ls_sales-data-kzazu = wa_file-kzazu.
   ls_sales-data-vsbed = '01'.
   ls_sales-data-kurst = 'M'.
-*  ls_sales-data-awahr = wa_file-awahr.
-*  ls_sales-datax-bzirk = 'X'.
   ls_sales-datax-kdgrp = 'X'.
   ls_sales-datax-vkbur = 'X'.
   ls_sales-datax-vkgrp = 'X'.
   ls_sales-datax-waers = 'X'.
   ls_sales-datax-kurst = 'X'.
-*  ls_sales-datax-konda = 'X'.
   ls_sales-datax-kalks = 'X'.
   ls_sales-datax-versg = 'X'.
-*  ls_sales-datax-lprio = 'X'.
-*  ls_sales-datax-kzazu = 'X'.
   ls_sales-datax-vsbed = 'X'.
-*  ls_sales-datax-untto = 'X'.
-*  ls_sales-datax-uebto = 'X'.
   ls_sales-datax-inco1 = 'X'.
   ls_sales-datax-inco2 = 'X'.
   ls_sales-datax-zterm = 'X'.
-*  ls_sales-datax-kkber = 'X'.
   ls_sales-datax-ktgrd = 'X'.
-*  ls_sales-datax-pltyp = 'X'.
-*  ls_sales-datax-vwerk = 'X'.
-*  ls_sales-datax-podkz = 'X'.
-*  ls_sales-datax-kvgr1 = 'X'.
-*  ls_sales-datax-kvgr2 = 'X'.
-*  ls_sales-datax-kvgr3 = 'X'.
-*  ls_sales-datax-kvgr4 = 'X'.
-*  ls_sales-datax-kvgr5 = 'X'.
-*  ls_sales-datax-kurst = 'X'.
-*  ls_sales-datax-awahr = 'X'.
-*  ls_sales-datax-agrel = 'X'.
-*  ls_sales-datax-bokre = 'X'.
-*  ls_sales-datax-incov = 'X'.
 
   DATA iv_ktokd TYPE ktokd.
   DATA et_parvw TYPE cmds_parvw_t.
-****  refresh et_parvw.
-****  refresh lt_sales_func.
   CALL METHOD cmd_ei_api_check=>get_mand_partner_functions
     EXPORTING
       iv_ktokd = kna1-ktokd
     IMPORTING
       et_parvw = et_parvw.
 
-*  BREAK abaper.
   LOOP AT et_parvw INTO DATA(wa_parvw).
     ls_sales_func-task = 'I'.
     ls_sales_func-data_key-parvw = wa_parvw-parvw.
@@ -1065,144 +853,11 @@ FORM maintain_customer_s .
     CLEAR ls_sales_func.
   ENDLOOP.
   ls_sales-functions-functions = lt_sales_func[].
-****  append ls_sales to lt_sales.
-**  if wa_file-spart1 is not initial.
-**    ls_sales-data_key-spart = wa_file-spart1.
-**    ls_sales-data-zterm = wa_file-zterm1.
-**    append ls_sales to lt_sales.
-**  endif.
-**  if wa_file-spart2 is not initial.
-**    ls_sales-data_key-spart = wa_file-spart2.
-**    ls_sales-data-zterm = wa_file-zterm2.
-**    append ls_sales to lt_sales.
-**  endif.
-**  if wa_file-spart3 is not initial.
-**    ls_sales-data_key-spart = wa_file-spart3.
-**    ls_sales-data-zterm = wa_file-zterm3.
-**    append ls_sales to lt_sales.
-**  endif.
-**  if wa_file-spart4 is not initial.
-**    ls_sales-data_key-spart = wa_file-spart4.
-**    ls_sales-data-zterm = wa_file-zterm4.
-**    append ls_sales to lt_sales.
-**  endif.
-**  if wa_file-spart5 is not initial.
-**    ls_sales-data_key-spart = wa_file-spart5.
-**    ls_sales-data-zterm = wa_file-zterm5.
-**    append ls_sales to lt_sales.
-**  endif.
-**  if wa_file-spart6 is not initial.
-**    ls_sales-data_key-spart = wa_file-spart6.
-**    ls_sales-data-zterm = wa_file-zterm6.
-**    append ls_sales to lt_sales.
-**  endif.
-*  if wa_file-vtweg2 is not initial.
-*    ls_sales-data_key-vtweg = wa_file-vtweg2."'L2'.
-*    append ls_sales to lt_sales.
-*  endif.
-*  if wa_file-vtweg3 is not initial.
-*    ls_sales-data_key-vtweg = wa_file-vtweg3.".'L3'.
   APPEND ls_sales TO lt_sales.
-*  endif.
-
-*  ls_tax_data-data-taxkd     = wa_file-taxkd01.
-*  ls_tax_data-data-taxkd     = wa_file-taxkd02.
-*  ls_tax_data-data-taxkd     = wa_file-taxkd03.
-*  ls_tax_data-data-taxkd     = wa_file-taxkd04.
 
   ls_sales_data-sales = lt_sales[].
 
-*  select single kunnr from knvv into @data(l_kunnr) where kunnr = @ls_customers-header-object_instance-kunnr.
-*  if sy-subrc <> 0.
-*
-*    clear gwa_knvi.
-*    select single * from knvi into gwa_knvi where kunnr = w_log-customer
-*                                              and aland = 'IN'
-*                                              and tatyp = 'JOCG' .
-*    if gwa_knvi is initial.
-*      ls_tax_data-task = 'I'.
-*      ls_tax_data-data_key-aland = 'IN'.
-*      ls_tax_data-data_key-tatyp = 'JOCG'.
-*      ls_tax_data-data-taxkd     = wa_file-taxkd01.
-*      ls_tax_data-datax-taxkd    = 'X'.
-*      append ls_tax_data to lt_tax_data.
-*    endif.
-*    clear gwa_knvi.
-*    select single * from knvi into gwa_knvi where kunnr = w_log-customer
-*                                              and aland = 'IN'
-*                                              and tatyp = 'JOSG' .
-*
-*    if gwa_knvi is initial.
-*      ls_tax_data-task = 'I'.
-*      ls_tax_data-data_key-aland = 'IN'.
-*      ls_tax_data-data_key-tatyp = 'JOSG'.
-*      ls_tax_data-data-taxkd     = wa_file-taxkd02.
-*      ls_tax_data-datax-taxkd    = 'X'.
-*      append ls_tax_data to lt_tax_data.
-*    endif.
-*
-*    clear gwa_knvi.
-*
-*    select single * from knvi into gwa_knvi where kunnr = w_log-customer
-*                                              and aland = 'IN'
-*                                              and tatyp = 'JOIG' .
-*
-*    if gwa_knvi is initial.
-*      ls_tax_data-task = 'I'.
-*      ls_tax_data-data_key-aland = 'IN'.
-*      ls_tax_data-data_key-tatyp = 'JOIG'.
-*      ls_tax_data-data-taxkd     = wa_file-taxkd03.
-*      ls_tax_data-datax-taxkd    = 'X'.
-*      append ls_tax_data to lt_tax_data.
-*    endif.
-*
-*
-*    clear gwa_knvi.
-*    select single * from knvi into gwa_knvi where kunnr = w_log-customer
-*                                              and aland = 'IN'
-*                                              and tatyp = 'JKFC' .
-*
-*    if gwa_knvi is initial.
-*      ls_tax_data-task = 'I'.
-*      ls_tax_data-data_key-aland = 'IN'.
-*      ls_tax_data-data_key-tatyp = 'JKFC'.
-*      ls_tax_data-data-taxkd     = wa_file-taxkd04.
-*      ls_tax_data-datax-taxkd    = 'X'.
-*      append ls_tax_data to lt_tax_data.
-*    endif.
-*
-*    clear gwa_knvi.
-*
-*    select single * from knvi into gwa_knvi where kunnr = w_log-customer
-*                                              and aland = 'IN'
-*                                              and tatyp = 'JTC1' .
-*
-*    if gwa_knvi is initial.
-*      ls_tax_data-task = 'I'.
-*      ls_tax_data-data_key-aland = 'IN'.
-*      ls_tax_data-data_key-tatyp = 'JTC1'.
-*      ls_tax_data-data-taxkd     = '0'.
-*      ls_tax_data-datax-taxkd    = 'X'.
-*      append ls_tax_data to lt_tax_data.
-*    endif.
-*
-*    clear gwa_knvi.
-*
-*    select single * from knvi into gwa_knvi where kunnr = w_log-customer
-*                                              and aland = 'IN'
-*                                              and tatyp = 'JOUG' .
-*
-*    if gwa_knvi is initial.
-*      ls_tax_data-task = 'I'.
-*      ls_tax_data-data_key-aland = 'IN'.
-*      ls_tax_data-data_key-tatyp = 'JOUG'.
-*      ls_tax_data-data-taxkd     = '0'.
-*      ls_tax_data-datax-taxkd    = 'X'.
-*      append ls_tax_data to lt_tax_data.
-*    endif.
-
   ls_central_data-tax_ind-tax_ind = lt_tax_data.
-*  endif.
   ls_customers-central_data = ls_central_data.
   ls_customers-sales_data = ls_sales_data.
 
@@ -1215,12 +870,7 @@ FORM maintain_customer_s .
   ls_remarks-datax-adr_notes = 'X'.
   APPEND ls_remarks TO lt_remarks.
 
-*  break abaper.
-*  gt_remarks-remarks-task = ls_customers-central_data-address-task = 'I'.
   ls_customers-central_data-address-remark-remarks = lt_remarks[].
-*  APPEND ls_customers TO lt_customers.
-  BREAK abaper.
-*  ls_customers-central_data
 
   REFRESH: lt_company[].
   CLEAR ls_company.
@@ -1270,11 +920,7 @@ FORM maintain_customer_s .
     w_log-uname = sy-uname.
     w_log-bpname = kna1-name1.
     APPEND w_log TO t_log.
-*    INSERT zbp_upload FROM w_log.
     CLEAR w_log.
-
-*+Sanket
-    BREAK abaper.
     SELECT SINGLE * FROM knb1 WHERE kunnr = ls_customers-header-object_instance-kunnr      .
     IF sy-subrc = 0.
       UPDATE knb1
@@ -1282,13 +928,7 @@ FORM maintain_customer_s .
     WHERE kunnr = ls_customers-header-object_instance-kunnr.
     ENDIF.
 
-*    lv_partner = ls_customers-header-object_instance-kunnr.
     lv_partner = businesspartner.
-
-**    if wa_file-limit is not initial.
-**
-**      lv_credit_sgmnt = '1000'.
-**
     io_facade = cl_ukm_facade=>create( i_activity = cl_ukm_cnst_eventing=>bp_maintenance ).
     io_bupa_factory = io_facade->get_bupa_factory( ).
     io_calculator = io_facade->get_calculator( ).
@@ -1296,12 +936,8 @@ FORM maintain_customer_s .
 **
 *** Set Credit Profile Data
     wa_bp_cms-risk_class = '001'.
-
     wa_bp_cms-limit_rule = 'STANDARD'.
-*
     wa_bp_cms-check_rule = '03'.
-
-*    io_partner->set_bp_cms( EXPORTING is_bp_cms = wa_bp_cms ).
     io_partner->set_bp_cms( wa_bp_cms ).
 
 * Get Credit Account
@@ -1312,28 +948,19 @@ FORM maintain_customer_s .
       RECEIVING
         ro_credit_account = io_account.
 
-**      if io_account is not initial.
-**
 * get credit segment data
     io_account->get_bp_cms_sgm( IMPORTING es_bp_cms_sgm = wa_bp_credit_sgm ).
 
     wa_bp_credit_sgm-credit_limit = wa_file-credit_limit.
     wa_bp_credit_sgm-xcritical = 'X'.
     wa_bp_credit_sgm-limit_chg_date = sy-datum.
-**
+
 * Set Credit Segment Data.
     io_account->set_bp_cms_sgm( EXPORTING is_bp_cms_sgm = wa_bp_credit_sgm ).
-**
+
 * Get Credit Profile Data
 
-*    io_partner->get_bp_cms( IMPORTING es_bp_cms = wa_bp_cms ).
-**
-
-
-*** Update the credit segment and credit profile
-**
-*    io_bupa_factory->save_all( EXPORTING i_upd_task = abap_true
-*                               RECEIVING et_return  = i_return ).
+* Update the credit segment and credit profile
 
     io_bupa_factory->save_all( ).
 
@@ -1350,273 +977,6 @@ FORM maintain_customer_s .
       ENDIF.
 
     ENDIF.
-**      endif.
-**
-**    endif.
-**
-**    if wa_file-limit1 is not initial.
-**
-**      lv_credit_sgmnt = '1221'.
-**
-**      io_facade = cl_ukm_facade=>create( i_activity = cl_ukm_cnst_eventing=>bp_maintenance ).
-**      io_bupa_factory = io_facade->get_bupa_factory( ).
-**      io_partner = io_bupa_factory->get_business_partner( lv_partner ).
-**
-*** Get Credit Account
-**      call method io_bupa_factory->get_credit_account
-**        exporting
-**          i_partner         = lv_partner
-**          i_credit_sgmnt    = lv_credit_sgmnt
-**        receiving
-**          ro_credit_account = io_account.
-**
-**      if io_account is not initial.
-**
-*** get credit segment data
-**        io_account->get_bp_cms_sgm( importing es_bp_cms_sgm = wa_bp_credit_sgm ).
-**
-**        wa_bp_credit_sgm-credit_limit = wa_file-limit1.
-**
-*** Set Credit Segment Data.
-**        io_account->set_bp_cms_sgm( exporting is_bp_cms_sgm = wa_bp_credit_sgm ).
-**
-*** Get Credit Profile Data
-**
-**        io_partner->get_bp_cms( importing es_bp_cms = wa_bp_cms ).
-**
-*** Set Credit Profile Data
-**        wa_bp_cms-limit_rule = 'STANDARD'.
-**
-**        io_partner->set_bp_cms( exporting is_bp_cms = wa_bp_cms ).
-**
-*** Update the credit segment and credit profile
-**
-**        io_bupa_factory->save_all( exporting i_upd_task = abap_false
-**        receiving et_return = i_return   ).
-**
-**      endif.
-**
-**    endif.
-**
-**    if wa_file-limit2 is not initial.
-**
-**      lv_credit_sgmnt = '1222'.
-**
-**      io_facade = cl_ukm_facade=>create( i_activity = cl_ukm_cnst_eventing=>bp_maintenance ).
-**      io_bupa_factory = io_facade->get_bupa_factory( ).
-**      io_partner = io_bupa_factory->get_business_partner( lv_partner ).
-**
-*** Get Credit Account
-**      call method io_bupa_factory->get_credit_account
-**        exporting
-**          i_partner         = lv_partner
-**          i_credit_sgmnt    = lv_credit_sgmnt
-**        receiving
-**          ro_credit_account = io_account.
-**
-**      if io_account is not initial.
-**
-*** get credit segment data
-**        io_account->get_bp_cms_sgm( importing es_bp_cms_sgm = wa_bp_credit_sgm ).
-**
-**        wa_bp_credit_sgm-credit_limit = wa_file-limit2.
-**
-*** Set Credit Segment Data.
-**        io_account->set_bp_cms_sgm( exporting is_bp_cms_sgm = wa_bp_credit_sgm ).
-**
-*** Get Credit Profile Data
-**
-**        io_partner->get_bp_cms( importing es_bp_cms = wa_bp_cms ).
-**
-*** Set Credit Profile Data
-**        wa_bp_cms-limit_rule = 'STANDARD'.
-**
-**        io_partner->set_bp_cms( exporting is_bp_cms = wa_bp_cms ).
-**
-*** Update the credit segment and credit profile
-**
-**        io_bupa_factory->save_all( exporting i_upd_task = abap_false
-**        receiving et_return = i_return   ).
-**
-**      endif.
-**
-**    endif.
-**
-**    if wa_file-limit3 is not initial.
-**
-**      lv_credit_sgmnt = '1223'.
-**
-**      io_facade = cl_ukm_facade=>create( i_activity = cl_ukm_cnst_eventing=>bp_maintenance ).
-**      io_bupa_factory = io_facade->get_bupa_factory( ).
-**      io_partner = io_bupa_factory->get_business_partner( lv_partner ).
-**
-*** Get Credit Account
-**      call method io_bupa_factory->get_credit_account
-**        exporting
-**          i_partner         = lv_partner
-**          i_credit_sgmnt    = lv_credit_sgmnt
-**        receiving
-**          ro_credit_account = io_account.
-**
-**      if io_account is not initial.
-**
-*** get credit segment data
-**        io_account->get_bp_cms_sgm( importing es_bp_cms_sgm = wa_bp_credit_sgm ).
-**
-**        wa_bp_credit_sgm-credit_limit = wa_file-limit3.
-**
-*** Set Credit Segment Data.
-**        io_account->set_bp_cms_sgm( exporting is_bp_cms_sgm = wa_bp_credit_sgm ).
-**
-*** Get Credit Profile Data
-**
-**        io_partner->get_bp_cms( importing es_bp_cms = wa_bp_cms ).
-**
-*** Set Credit Profile Data
-**        wa_bp_cms-limit_rule = 'STANDARD'.
-**
-**        io_partner->set_bp_cms( exporting is_bp_cms = wa_bp_cms ).
-**
-*** Update the credit segment and credit profile
-**
-**        io_bupa_factory->save_all( exporting i_upd_task = abap_false
-**        receiving et_return = i_return   ).
-**
-**      endif.
-**
-**    endif.
-**
-**    if wa_file-limit4 is not initial.
-**
-**      lv_credit_sgmnt = '1224'.
-**
-**      io_facade = cl_ukm_facade=>create( i_activity = cl_ukm_cnst_eventing=>bp_maintenance ).
-**      io_bupa_factory = io_facade->get_bupa_factory( ).
-**      io_partner = io_bupa_factory->get_business_partner( lv_partner ).
-**
-*** Get Credit Account
-**      call method io_bupa_factory->get_credit_account
-**        exporting
-**          i_partner         = lv_partner
-**          i_credit_sgmnt    = lv_credit_sgmnt
-**        receiving
-**          ro_credit_account = io_account.
-**
-**      if io_account is not initial.
-**
-*** get credit segment data
-**        io_account->get_bp_cms_sgm( importing es_bp_cms_sgm = wa_bp_credit_sgm ).
-**
-**        wa_bp_credit_sgm-credit_limit = wa_file-limit4.
-**
-*** Set Credit Segment Data.
-**        io_account->set_bp_cms_sgm( exporting is_bp_cms_sgm = wa_bp_credit_sgm ).
-**
-*** Get Credit Profile Data
-**
-**        io_partner->get_bp_cms( importing es_bp_cms = wa_bp_cms ).
-**
-*** Set Credit Profile Data
-**        wa_bp_cms-limit_rule = 'STANDARD'.
-**
-**        io_partner->set_bp_cms( exporting is_bp_cms = wa_bp_cms ).
-**
-*** Update the credit segment and credit profile
-**
-**        io_bupa_factory->save_all( exporting i_upd_task = abap_false
-**        receiving et_return = i_return   ).
-**
-**      endif.
-**
-**    endif.
-**
-**    if wa_file-limit5 is not initial.
-**
-**      lv_credit_sgmnt = '1225'.
-**
-**      io_facade = cl_ukm_facade=>create( i_activity = cl_ukm_cnst_eventing=>bp_maintenance ).
-**      io_bupa_factory = io_facade->get_bupa_factory( ).
-**      io_partner = io_bupa_factory->get_business_partner( lv_partner ).
-**
-*** Get Credit Account
-**      call method io_bupa_factory->get_credit_account
-**        exporting
-**          i_partner         = lv_partner
-**          i_credit_sgmnt    = lv_credit_sgmnt
-**        receiving
-**          ro_credit_account = io_account.
-**
-**      if io_account is not initial.
-**
-*** get credit segment data
-**        io_account->get_bp_cms_sgm( importing es_bp_cms_sgm = wa_bp_credit_sgm ).
-**
-**        wa_bp_credit_sgm-credit_limit = wa_file-limit5.
-**
-*** Set Credit Segment Data.
-**        io_account->set_bp_cms_sgm( exporting is_bp_cms_sgm = wa_bp_credit_sgm ).
-**
-*** Get Credit Profile Data
-**
-**        io_partner->get_bp_cms( importing es_bp_cms = wa_bp_cms ).
-**
-*** Set Credit Profile Data
-**        wa_bp_cms-limit_rule = 'STANDARD'.
-**
-**        io_partner->set_bp_cms( exporting is_bp_cms = wa_bp_cms ).
-**
-*** Update the credit segment and credit profile
-**
-*    io_bupa_factory->save_all( EXPORTING i_upd_task = abap_false
-*                               RECEIVING et_return  = i_return ).
-
-**      endif.
-**
-**    endif.
-**
-**    if wa_file-limit6 is not initial.
-**
-**      lv_credit_sgmnt = '1226'.
-**
-**      io_facade = cl_ukm_facade=>create( i_activity = cl_ukm_cnst_eventing=>bp_maintenance ).
-**      io_bupa_factory = io_facade->get_bupa_factory( ).
-**      io_partner = io_bupa_factory->get_business_partner( lv_partner ).
-**
-*** Get Credit Account
-**      call method io_bupa_factory->get_credit_account
-**        exporting
-**          i_partner         = lv_partner
-**          i_credit_sgmnt    = lv_credit_sgmnt
-**        receiving
-**          ro_credit_account = io_account.
-**
-**      if io_account is not initial.
-**
-*** get credit segment data
-**        io_account->get_bp_cms_sgm( importing es_bp_cms_sgm = wa_bp_credit_sgm ).
-**
-**        wa_bp_credit_sgm-credit_limit = wa_file-limit6.
-**
-*** Set Credit Segment Data.
-**        io_account->set_bp_cms_sgm( exporting is_bp_cms_sgm = wa_bp_credit_sgm ).
-**
-*** Get Credit Profile Data
-**
-**        io_partner->get_bp_cms( importing es_bp_cms = wa_bp_cms ).
-**
-*** Set Credit Profile Data
-**        wa_bp_cms-limit_rule = 'STANDARD'.
-**
-**        io_partner->set_bp_cms( exporting is_bp_cms = wa_bp_cms ).
-**
-*** Update the credit segment and credit profile
-**
-**        io_bupa_factory->save_all( exporting i_upd_task = abap_false
-**        receiving et_return = i_return   ).
-**
-**      endif.
-**
-**    endif.
 
   ELSE.
     LOOP AT es_message_defective-messages INTO DATA(wa).
@@ -1633,7 +993,6 @@ FORM maintain_customer_s .
       w_log-uname = sy-uname.
       w_log-bpname = kna1-name1.
       APPEND w_log TO t_log.
-*      INSERT zbp_upload FROM w_log.
       CLEAR w_log.
     ENDLOOP.
   ENDIF.
@@ -1723,11 +1082,6 @@ FORM maintain_vendor_s .""""""""""""" for vendor
     CLEAR ls_company.
     ls_company-task                    = 'I'.
     ls_company-data_key-bukrs  = wa_file-bukrs.
-*    call function 'CONVERSION_EXIT_ALPHA_INPUT'
-*      exporting
-*        input  = wa_file-akont1
-*      importing
-*        output = ls_company-data-akont.
     ls_company-datax-akont       = 'X'.
     APPEND ls_company TO lt_company.
     ls_company_data-company = lt_company[].
@@ -1761,9 +1115,7 @@ FORM maintain_vendor_s .""""""""""""" for vendor
     w_log-erdat = sy-datum.
     w_log-uname = sy-uname.
     w_log-bpname = lfa1-name1.
-*        w_log-serial = wa_file-serial.
     APPEND w_log TO t_log.
-*    INSERT zbp_upload FROM w_log.
     CLEAR w_log.
   ELSE. " ELSE -> IF gs_err_messages-is_error IS INITIAL
     LOOP AT gs_err_messages-messages INTO DATA(wa).
@@ -1777,9 +1129,7 @@ FORM maintain_vendor_s .""""""""""""" for vendor
       w_log-erdat = sy-datum.
       w_log-uname = sy-uname.
       w_log-bpname = lfa1-name1.
-*          w_log-serial = wa_file-serial.
       APPEND w_log TO t_log.
-*      INSERT zbp_upload FROM w_log.
       CLEAR w_log.
     ENDLOOP.
   ENDIF.
@@ -1803,9 +1153,6 @@ FORM display_log_customer_s .
       it_fieldcat  = t_fcat
     TABLES
       t_outtab     = t_log
-* EXCEPTIONS
-*     PROGRAM_ERROR                     = 1
-*     OTHERS       = 2
     .
   IF sy-subrc <> 0.
 * Implement suitable error handling here
@@ -1869,9 +1216,6 @@ FORM display_log_customer_cc .
       it_fieldcat  = t_fcat
     TABLES
       t_outtab     = t_log
-* EXCEPTIONS
-*     PROGRAM_ERROR                     = 1
-*     OTHERS       = 2
     .
   IF sy-subrc <> 0.
 * Implement suitable error handling here
