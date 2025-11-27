@@ -1,0 +1,1968 @@
+*&---------------------------------------------------------------------*
+*& Report ZFIR_UPLOAD_DATA
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT zfir_upload_data.
+*&---------------------------------------------------------------------*
+*& Report ZFI_UPLOAD_DATA
+*&---------------------------------------------------------------------*
+*Copy program from AVQ to AIQ
+*&---------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*& Changed By : Shital Wagh
+*& Changed On : 05.12.2024
+*& Purpose    : To add header text in download template
+*&---------------------------------------------------------------------*
+TABLES: bapiacgl09. "zfi_dm.
+
+DATA :capid      TYPE  c,
+      i_taxcom   TYPE  taxcom,
+      t_xkomv    TYPE TABLE OF  komv,
+      t_xkomv1   TYPE TABLE OF  komv,
+      t_xkomv2   TYPE TABLE OF  komv,
+      it_acc_tax TYPE TABLE OF bapiactx09,
+      wa_acc_tax TYPE bapiactx09.
+
+DATA:lv_flag TYPE c.
+
+TYPES : BEGIN OF ty_t001w,
+          j_1bbranch TYPE j_1bbranch,
+          werks      TYPE t001w-werks,
+        END OF ty_t001w.
+
+DATA : it_t001w TYPE TABLE OF ty_t001w.
+DATA  gs_fieldcatalog TYPE slis_fieldcat_alv.
+
+DATA  gt_fieldcatalog TYPE slis_t_fieldcat_alv.
+
+TYPES : BEGIN OF gt_final,
+          light      TYPE afrui-light,
+          belnr(20),
+          error_type TYPE bdc_mart,
+          text(250)  TYPE c,
+        END OF gt_final.
+
+DATA : gs_final  TYPE gt_final,
+       is_layout TYPE slis_layout_alv,
+       gs_fcat   TYPE LINE OF slis_t_fieldcat_alv,
+       gt_fcat   TYPE slis_t_fieldcat_alv,
+       gs_line   TYPE tline.
+
+DATA :  gt_final     TYPE STANDARD TABLE OF gt_final.
+TYPES : BEGIN OF  ty_itab,
+          serial_no     TYPE char100,  " SR NO
+          bukrs         TYPE bkpf-bukrs,  " COM CODE
+          bldat(10)     TYPE c,                       " DOC DATE
+          budat(10)     TYPE c,                       " POSTING DATE
+          blart         TYPE bkpf-blart,    " DOC TYPE
+          bktxt         TYPE bkpf-bktxt,   " HEADER TEXT
+          xblnr         TYPE bkpf-xblnr,   " REF
+          kursf         TYPE bkpf-kursf,   " EXCHANGE RATE
+          waers         TYPE bkpf-waers,   "  CURRENCY
+          xblnr_alt     TYPE bkpf-xblnr,   "  ALT .REF
+          ccnum         TYPE bkpf-ccnum,   " CARD NO
+          umskz         TYPE c, "UMSKZ ,     " SP GL IND.
+          bewar         TYPE rmvct,      " Transaction type  ey_abap
+          hkont         TYPE bseg-hkont,  " GL AC
+          lifnr         TYPE lfa1-lifnr, " VENDOR
+          kunnr         TYPE kna1-kunnr, " CUSTOMER
+          hkont1        TYPE  bseg-hkont, "  Alternative Reconciliation Account
+          kokrs         TYPE char5,     "  Credit Control Area.
+          dmbtr         TYPE bseg-dmbtr,  " AMOUNT LC
+          wrbtr         TYPE bseg-wrbtr,  " AMOUNT
+          xref3         TYPE bseg-xref3,   " Ref.key 3
+          zfbdt(10)     TYPE c,     " base line date.
+          zterm         TYPE bseg-zterm, "DZTERM,     " PAYMETN TERM.
+          valut         TYPE     bseg-valut , " VALUE date
+          zuonr         TYPE bseg-zuonr,   " Assignment
+          material_long TYPE matnr40, " MATERIAL CODE
+          plant         TYPE werks_d, "PLANT
+          val_type      TYPE bwtar_d, "VALUTION TYPE
+          menge         TYPE menge_d , " QUANTITY
+          meins         TYPE meins, "UOM
+          sgtxt         TYPE bseg-sgtxt,   " ITEM_TEXT
+          mwskz         TYPE bseg-mwskz , " TAXCODE
+          bupla         TYPE bseg-bupla, " BUSINESSPLACE
+          gsber         TYPE bseg-gsber,  "Business Area
+          secco         TYPE char4, "SECCO ,      " SECTION CODE.
+          kostl         TYPE bseg-kostl, " cost centr
+          prctr         TYPE bseg-prctr, " PROFIT CENTER
+          pspnr         TYPE char40,    "prps-pspnr, " wbs
+          aufnr         TYPE bseg-aufnr, " internal order
+          artnr         TYPE marc-matnr, "c LENGTH 40," COPA Characteristics1 Material Code
+          werks         TYPE c LENGTH 4 , "COPA Characteristics1 Plant
+          kmvkbu        TYPE c LENGTH 4, " COPA Characteristics1 Sales Office
+          kndnr         TYPE kna1-kunnr, "c LENGTH 10, " COPA Characteristics1 customer code
+          charg         TYPE c LENGTH 10, " COPA Characteristics1 batch
+          co_prctr      TYPE cepc-prctr,  " COPA Characteristics1 Profit Center
+          vtweg         TYPE vtweg,       " COPA Char Distribution Channel
+          vkorg         TYPE vkorg,        " COPA Char Sales Organization
+          land1         TYPE kna1-land1, " Country Code
+*          ww106         TYPE ce01000-ww106, " Sales Type
+          ww106         TYPE vbak-auart, " Sales Type
+          xref1         TYPE bseg-xref1,   " Ref.key 1
+          xref2         TYPE bseg-xref2,   " Ref.key 2
+          zlspr         TYPE  bseg-zlspr,    "Payment method
+          zlsch         TYPE c, "DZLSCH ,    "PAYMENT METHOD.
+          hbkid         TYPE char5, "HBKID,      " HOUSE BANK.
+          paymt_ref(30) TYPE c,      " PAYMENT REF.
+          qbshb         TYPE char5 ,      " WITH HOLDING TAX
+          qbshb1        TYPE char5 ,     " WITH HOLDING CODE
+          wtbamt        TYPE bseg-dmbtr ,    " Withholding Tax Base Amount
+          pernr         TYPE bseg-pernr,     "  Personal no
+          capind        TYPE c,                                  "invesment id
+          hsn_sac       TYPE bseg-hsn_sac,
+          vbund         TYPE bseg-vbund,
+* Replace Start By Shital W. On 05.12.2024
+*          posid         TYPE prps-pspnr,
+          posid         TYPE prps-posid, " WBS Element
+* Replace End By Shital W. On 05.12.2024
+          fis_period    TYPE bapiache09-fis_period,     " Added by Amol on 03.06.2025
+
+        END OF ty_itab,
+        BEGIN OF ty_error,
+          serial_no TYPE char100,
+          blart     TYPE bkpf-blart,    " DOC TYPE
+          hkont     TYPE bseg-hkont,    " GL AC
+          lifnr     TYPE lfa1-lifnr,    " VENDOR
+          kunnr     TYPE kna1-kunnr,    " CUSTOMER
+          msg       TYPE char100,       " msg
+        END OF ty_error,
+
+        BEGIN OF ty_csks,
+          kostl TYPE csks-kostl,
+          prctr TYPE csks-prctr,
+        END OF ty_csks,
+
+        BEGIN OF ty_prps,
+          pspnr TYPE prps-pspnr,
+          prctr TYPE prps-prctr,
+        END OF ty_prps,
+
+        BEGIN OF ty_aufk,
+          aufnr TYPE aufk-aufnr,
+          prctr TYPE aufk-prctr,
+        END OF ty_aufk,
+
+        BEGIN OF ty_marc,
+          matnr TYPE matnr,
+          werks TYPE marc-werks,
+          prctr TYPE  aufk-prctr,
+        END OF ty_marc.
+
+
+DATA : it_aufk TYPE TABLE OF ty_aufk,
+       it_csks TYPE TABLE OF ty_csks,
+       it_prps TYPE TABLE OF ty_prps,
+       it_marc TYPE TABLE OF ty_marc.
+
+
+
+TYPES: BEGIN OF gt_excel,
+*         fld39(40) TYPE c,
+         fld1(40)  TYPE c,
+         fld2(40)  TYPE c,
+         fld3(40)  TYPE c,
+         fld4(40)  TYPE c,
+         fld5(40)  TYPE c,
+         fld6(40)  TYPE c,
+         fld7(40)  TYPE c,
+         fld8(40)  TYPE c,
+         fld9(40)  TYPE c,
+         fld10(40) TYPE c,
+         fld11(40) TYPE c,
+         fld12(40) TYPE c,
+         fld57(40) TYPE c,
+         fld13(40) TYPE c,
+         fld14(40) TYPE c,
+         fld15(40) TYPE c,
+         fld16(40) TYPE c,
+         fld17(40) TYPE c,
+         "*****************
+         fld18(40) TYPE c,
+         fld19(40) TYPE c,
+         fld20(40) TYPE c,
+         fld21(40) TYPE c,
+         fld22(40) TYPE c,
+         fld23(40) TYPE c,
+         fld24(40) TYPE c,
+         fld25(40) TYPE c,
+         fld26(40) TYPE c,
+
+         fld27(40) TYPE c,
+         fld28(40) TYPE c,
+         fld29(40) TYPE c,
+         fld30(40) TYPE c,
+         fld31(40) TYPE c,
+         fld32(40) TYPE c,
+         fld33(40) TYPE c,
+         fld34(40) TYPE c, "'
+         fld35(40) TYPE c, "'
+         fld36(40) TYPE c, "'
+         fld37(40) TYPE c, "'
+         fld38(40) TYPE c, "'
+         fld39(60) TYPE c, "'
+         fld40(60) TYPE c, "'
+         fld41(60) TYPE c,
+         fld42(60) TYPE c, "'
+         fld43(60) TYPE c, "' " COPA BATCH
+         fld55(60) TYPE c, " COPA PROFIT CENTER
+         fld56(60) TYPE c, " COPA Distr
+         fld60(60) TYPE c, " Sales Org
+         fld61(60) TYPE c, " Country
+         fld62(60) TYPE c, " Sales Type
+         fld44(60) TYPE c, "'
+         fld45(40) TYPE c,
+         fld46(60) TYPE c, "'
+         fld47(60) TYPE c, "'
+         fld48(60) TYPE c, "'
+         fld49(60) TYPE c,
+         fld50(60) TYPE c,
+         fld51(60) TYPE c,
+         fld52(60) TYPE c,
+         fld53(60) TYPE c,
+         fld54(60) TYPE c,
+         fld58(60) TYPE c,   ""transaction type
+         fld59(60) TYPE c,   ""transaction type
+* Insert Start By Shital W. On 02.12.2024
+         fld63(60) TYPE c, " WBS
+* Insert End By Shital W. On 02.12.2024
+         fld64(60) TYPE c, " Added by Amol on 03.06.2025
+       END OF gt_excel,
+       BEGIN OF ty_t001,
+         bukrs TYPE bukrs,
+         waers TYPE waers,
+       END OF ty_t001.
+
+DATA : lt_itab  TYPE STANDARD TABLE OF ty_itab,
+       ls_itab  TYPE ty_itab,
+       ls_itab1 TYPE ty_itab,
+       lt_error TYPE STANDARD TABLE OF ty_error,
+       ls_error TYPE ty_error,
+       lt_t001  TYPE TABLE OF ty_t001.
+
+*
+*DATA : it_zfi_dm TYPE TABLE OF zfi_dm,
+*       wa_zfi_dm TYPE zfi_dm.
+DATA : msg1 TYPE string.
+DATA: it_intern TYPE alsmex_tabline OCCURS 0 WITH HEADER LINE.
+DATA:wa_documentheader TYPE bapiache09,
+     it_accgl          TYPE TABLE OF  bapiacgl09, "G/L account item
+     wa_accgl          TYPE bapiacgl09,           "G/L account item
+     it_curramt        TYPE TABLE OF  bapiaccr09, "Currency Items
+     wa_curramt        TYPE bapiaccr09,           "Currency Items
+     it_extension2     TYPE TABLE OF bapiparex,
+     wa_extension2     TYPE bapiparex,
+     it_extension1     TYPE TABLE OF bapiacextc,
+     wa_extension1     TYPE bapiacextc,
+     it_paymentcard    TYPE TABLE OF bapiacpc09,   " PAYMENTCARD
+     wa_paymentcard    TYPE bapiacpc09,            " PAYMENTCARD
+     it_acc_rec        TYPE TABLE OF bapiacar09,            " Customer Item , ACCOUNTRECEIVABLE.
+     wa_acc_rec        TYPE bapiacar09,            " Customer Item , ACCOUNTRECEIVABLE.
+     wa_acc_pay        TYPE bapiacap09,            " vendor item, accountpayable
+     it_acc_pay        TYPE TABLE OF  bapiacap09,            " vendor item,
+     it_accountwt      TYPE TABLE OF bapiacwt09,            " Withholding tax information for FI Interfac.
+     wa_accountwt      TYPE bapiacwt09,            " Withholding tax information for FI Interfac.
+     lv_tabix          TYPE sy-tabix,
+     l_tabix           TYPE sy-tabix,
+     l_index           TYPE sy-tabix,
+     lv_item           TYPE posnr_acc, " FOR GL AC
+     lv_item1          TYPE posnr_acc, " FOR CUSTOMER
+     lv_item2          TYPE posnr_acc, " FOR CUSTOMER
+     lv_tcode          TYPE sy-tcode,
+     it_return         TYPE bapiret2 OCCURS 0 WITH HEADER LINE,
+     wa_bapiret1       TYPE bapiret2,
+     it_bapiret1       TYPE TABLE OF bapiret2,
+     it_bapiret2       TYPE TABLE OF bapiret2,
+     gt_iexcel         TYPE TABLE OF gt_excel,
+     gw_xexcel         TYPE gt_excel,
+     it_criteria       TYPE TABLE OF bapiackec9,
+     wa_criteria       TYPE  bapiackec9.
+DATA : v_message(100) TYPE c.
+DATA: gt_file_err_log TYPE bapirettab, "gty_file_erro_log,
+      gw_file_err_log TYPE bapiret2. "gty_file_erro_log.
+
+
+SELECTION-SCREEN : BEGIN OF BLOCK sel01 WITH FRAME TITLE TEXT-100.
+  PARAMETERS: p_rb1 RADIOBUTTON GROUP rb1 USER-COMMAND r1 DEFAULT 'X',
+              p_rb2 RADIOBUTTON GROUP rb1.
+
+  PARAMETERS:p_file TYPE rlgrap-filename, "ibipparms-path,
+             p_post TYPE c AS CHECKBOX.
+
+  DATA : p_file1        TYPE string,
+         gw_path        TYPE string,
+         gw_fullpath    TYPE string,
+         gw_user_action TYPE i,
+         gw_encoding    TYPE abap_encoding.
+
+  CONSTANTS: c_title     TYPE string    VALUE 'Select Path',
+             c_param1    TYPE string    VALUE 'ZFI_DATA_MIGRATION',
+             c_kokrs     TYPE kokrs     VALUE '1000',
+             c_fstag     TYPE fstag     VALUE 'Z002',
+             c_ktopl     TYPE ktopl     VALUE '1000',
+             c_bapiid    TYPE symsgid   VALUE 'ZFI_VAL',
+             c_bapino    TYPE symsgno   VALUE '32',
+             c_bapino_34 TYPE symsgno   VALUE '34',
+             c_bapino_29 TYPE symsgno   VALUE '29',
+             c_tcode     TYPE sy-tcode  VALUE 'ZFI_UPD',
+             c_mem_id1   TYPE char15    VALUE 'ZFI_UPD_CAPID',
+             c_mem_id2   TYPE char15    VALUE 'ZFI_GLBAL',
+             c_605       TYPE symsgno   VALUE '605',
+             c_609       TYPE symsgno   VALUE '609',
+             c_03        TYPE char2     VALUE '03',
+             c_slash     TYPE c         VALUE '/',
+             c_curtp00   TYPE curtp     VALUE '00',
+             c_curtp10   TYPE curtp     VALUE '10',
+             c_currency  TYPE waers     VALUE 'INR',
+             c_xlsx      TYPE string    VALUE '*.XLSX',
+             c_xls       TYPE string    VALUE '.XLS',
+             c_land1     TYPE land1     VALUE 'IN',
+             c_mig_obj1  TYPE char20    VALUE 'FI_GL_OPEN_ITEM',
+             c_mig_obj2  TYPE char20    VALUE 'FI_VENDOR_OPEN_ITEM',
+             c_mig_obj3  TYPE char21    VALUE 'FI_CUSTOMER_OPEN_ITEM',
+             c_auth      TYPE char7     VALUE 'S_TCODE',
+             c_auth1     TYPE char10     VALUE 'F_BKPF_BUK',
+             c_obj       TYPE char20    VALUE 'ZFI_UPD',
+             c_subobj    TYPE char20    VALUE 'ZFI_UPD_SUB',
+             c_struct    TYPE te_struc  VALUE 'ACCBAPI_S4EXT',
+             c_field1    TYPE fieldname VALUE 'PRCTR',
+             c_field2    TYPE fieldname VALUE 'ARTNR',
+             c_field3    TYPE fieldname VALUE 'WERKS',
+             c_field4    TYPE fieldname VALUE 'KMVKBU',
+             c_field5    TYPE fieldname VALUE 'KNDNR',
+             c_field6    TYPE fieldname VALUE 'CHARG',
+             c_field7    TYPE fieldname VALUE 'BWTAR',
+             c_field8    TYPE fieldname VALUE 'VTWEG',
+             gc_vkorg    TYPE fieldname VALUE 'VKORG',
+             gc_land1    TYPE fieldname VALUE 'LAND1',
+             gc_ww106    TYPE fieldname VALUE 'WW106'.
+SELECTION-SCREEN : END OF BLOCK sel01.
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_file.
+  IF p_rb2 = 'X' .
+    CALL FUNCTION 'F4_FILENAME'
+      EXPORTING
+        program_name  = syst-cprog
+        dynpro_number = syst-dynnr
+      IMPORTING
+        file_name     = p_file.
+
+    IF sy-subrc <> 0.
+      CLEAR lv_flag .
+    ENDIF.
+  ELSEIF  p_rb1 = 'X'.
+    CALL METHOD cl_gui_frontend_services=>file_save_dialog
+      EXPORTING
+        window_title              = c_title "'Select Path'  "#EC NO_TEXT
+*       default_extension         = 'XLS'
+*       default_file_name         = 'TestTest1'
+*       with_encoding             = zcl_constant_declaration=>gc_x
+*       file_filter               = 'XLS'
+*       initial_directory         = 'C:\Users\'
+*       prompt_on_overwrite       = zcl_constant_declaration=>gc_x
+      CHANGING
+        filename                  = p_file1
+        path                      = gw_path
+        fullpath                  = gw_fullpath
+        user_action               = gw_user_action
+        file_encoding             = gw_encoding
+      EXCEPTIONS
+        cntl_error                = 1
+        error_no_gui              = 2
+        not_supported_by_gui      = 3
+        invalid_default_file_name = 4
+        OTHERS                    = 5.
+    IF sy-subrc = 0.
+      CLEAR lv_flag.
+    ENDIF.
+    p_file = gw_fullpath.
+
+
+  ENDIF.
+*  at SELECTION-SCREEN.
+
+INITIALIZATION.
+  CLEAR it_bapiret2.
+
+START-OF-SELECTION.
+**EYABAP5
+*  AUTHORITY-CHECK OBJECT c_auth
+*      ID zcl_constant_declaration=>gc_fld_tcd
+*      FIELD zcl_constant_declaration=>gc_fld_fb01.
+  IF sy-subrc <> 0.
+    MESSAGE TEXT-m01
+    TYPE 'E'
+    DISPLAY LIKE 'I'. "
+  ENDIF.
+**
+*at SELECTION-SCREEN .
+  IF p_file IS INITIAL.
+    MESSAGE TEXT-m02
+    TYPE 'E'.
+  ENDIF.
+
+
+
+  IF p_rb1 EQ 'X'.
+    PERFORM download.
+  ELSE.
+
+    PERFORM upload_file_itab.
+    IF lt_error IS INITIAL.
+      PERFORM call_bapi.
+      PERFORM display.
+    ELSE.
+      PERFORM error_display.
+    ENDIF.
+  ENDIF.
+*&---------------------------------------------------------------------*
+*&      Form  get_f4help
+*&---------------------------------------------------------------------*
+FORM get_f4help .
+  IF p_rb1 = 'X'.
+    CALL FUNCTION 'F4_FILENAME'
+      EXPORTING
+        program_name  = syst-cprog
+        dynpro_number = syst-dynnr
+      IMPORTING
+        file_name     = p_file.
+  ELSEIF  p_rb2 = 'X'.
+    CALL METHOD cl_gui_frontend_services=>file_save_dialog
+      EXPORTING
+        window_title              = c_title "'Select Path'  "#EC NO_TEXT
+*       default_extension         = 'XLS'
+*       default_file_name         = 'TestTest1'
+*       with_encoding             = zcl_constant_declaration=>gc_x
+*       file_filter               = 'XLS'
+*       initial_directory         = 'C:\Users\'
+*       prompt_on_overwrite       = zcl_constant_declaration=>gc_x
+      CHANGING
+        filename                  = p_file1
+        path                      = gw_path
+        fullpath                  = gw_fullpath
+        user_action               = gw_user_action
+        file_encoding             = gw_encoding
+      EXCEPTIONS
+        cntl_error                = 1
+        error_no_gui              = 2
+        not_supported_by_gui      = 3
+        invalid_default_file_name = 4
+        OTHERS                    = 5.
+
+
+    p_file = gw_fullpath.
+
+
+  ENDIF.
+ENDFORM.                    " get_f4help
+*&---------------------------------------------------------------------*
+*&      Form  upload_file_itab
+*&---------------------------------------------------------------------*``
+FORM upload_file_itab .
+  DATA: ls_struct TYPE truxs_t_text_data.
+  CALL FUNCTION 'TEXT_CONVERT_XLS_TO_SAP'
+    EXPORTING
+*     i_field_seperator    = zcl_constant_declaration=>gc_x
+      i_line_header        = 'X'
+      i_tab_raw_data       = ls_struct
+      i_filename           = p_file
+    TABLES
+      i_tab_converted_data = lt_itab
+    EXCEPTIONS
+      conversion_failed    = 1
+      OTHERS               = 2.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+*    MESSAGE e028(zfi_val).
+    MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+       WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+  ENDIF.
+*  PERFORM validate_data.
+
+
+  SORT lt_itab BY serial_no ASCENDING.
+
+  LOOP AT lt_itab INTO DATA(wa_itab).
+    IF ( ( wa_itab-lifnr IS NOT INITIAL AND wa_itab-kunnr IS NOT INITIAL AND wa_itab-zfbdt IS INITIAL ) OR
+     ( wa_itab-lifnr IS NOT INITIAL AND wa_itab-kunnr IS INITIAL AND wa_itab-zfbdt IS INITIAL ) OR
+     ( wa_itab-lifnr IS INITIAL AND wa_itab-kunnr IS NOT INITIAL AND wa_itab-zfbdt IS INITIAL ) ) AND
+   wa_itab-hkont IS INITIAL.
+
+      ls_error-serial_no = wa_itab-serial_no.
+      ls_error-blart     = wa_itab-blart.
+      ls_error-hkont     = wa_itab-hkont.
+      ls_error-lifnr     = wa_itab-lifnr.
+      ls_error-kunnr     = wa_itab-kunnr.
+      ls_error-msg       = 'Base line date is mandatory while entering the Vendor and customer' .
+      APPEND ls_error TO lt_error.
+      CLEAR : ls_error ,wa_itab.
+    ENDIF.
+
+*    Begin of changes done by Amol om 03.06.2025
+     IF wa_itab-fis_period is INITIAL.
+        ls_error-serial_no = wa_itab-serial_no.
+      ls_error-blart     = wa_itab-blart.
+      ls_error-hkont     = wa_itab-hkont.
+      ls_error-lifnr     = wa_itab-lifnr.
+      ls_error-kunnr     = wa_itab-kunnr.
+      ls_error-msg       = 'Enter the Fiscal Period' .
+      APPEND ls_error TO lt_error.
+      CLEAR : ls_error ,wa_itab.
+     ENDIF.
+*    End of changes done by Amol om 03.06.2025
+
+  ENDLOOP.
+ENDFORM.                    " upload_file_itab
+
+*&---------------------------------------------------------------------*
+*&      Form  call_bapi
+*&---------------------------------------------------------------------*
+DATA : lv_year     TYPE gjahr,
+       setid       TYPE sethier-setid,
+       it_values   TYPE TABLE OF rgsb4,
+       lw_material TYPE matnr18,
+       lw_err_flag TYPE c.
+DATA: lw_flag TYPE char1.
+FORM call_bapi .
+
+  CLEAR: lw_flag.
+**
+  DATA(lt_itab1) = lt_itab.
+
+  DELETE ADJACENT DUPLICATES FROM lt_itab COMPARING serial_no.
+
+*  SELECT  param4 FROM zfi_param  INTO v_param4
+*   WHERE param1 = c_param1 "'ZFI_DATA_MIGRATION'
+*     AND param2 = c_param2 "'USER_ID'
+*     AND param4 = sy-uname
+*    AND active_flag = zcl_constant_declaration=>gc_x.
+                                                        "#EC CI_NOORDER
+*  ENDSELECT.
+  IF sy-subrc = 0.
+    CLEAR lv_flag.
+  ENDIF.
+
+  LOOP AT lt_itab1 INTO DATA(wa_itab1) .
+
+**EYABAP5
+*    AUTHORITY-CHECK OBJECT c_auth1
+*          ID zcl_constant_declaration=>gc_con_bukrs     ##AUTH_FLD_NO
+*          FIELD wa_itab1-bukrs
+*          ID zcl_constant_declaration=>gc_con_actvt
+*          FIELD zcl_constant_declaration=>gc_fld_02.
+
+    IF sy-subrc = 0.
+**
+      wa_itab1-kostl = |{ wa_itab1-kostl ALPHA = IN }|.
+      wa_itab1-aufnr = |{ wa_itab1-aufnr ALPHA = IN }|.
+
+      IF wa_itab1-material_long IS NOT INITIAL.
+        CALL FUNCTION 'CONVERSION_EXIT_MATN1_INPUT'
+          EXPORTING
+            input        = wa_itab1-material_long
+          IMPORTING
+            output       = wa_itab1-material_long
+          EXCEPTIONS
+            length_error = 1
+            OTHERS       = 2.
+        IF sy-subrc <> 0.
+          CLEAR lv_flag.
+        ENDIF.
+
+        IF wa_itab1-pspnr  IS NOT INITIAL.
+          CALL FUNCTION 'CONVERSION_EXIT_ABPSP_INPUT'
+            EXPORTING
+              input     = wa_itab1-pspnr
+            IMPORTING
+              output    = wa_itab1-posid
+            EXCEPTIONS
+              not_found = 1
+              OTHERS    = 2.
+          IF sy-subrc <> 0.
+            CLEAR lv_flag.
+          ENDIF.
+
+        ENDIF.
+
+      ENDIF.
+
+      CALL FUNCTION 'CONVERSION_EXIT_MATN1_INPUT'
+        EXPORTING
+          input        = wa_itab1-artnr
+        IMPORTING
+          output       = wa_itab1-artnr
+        EXCEPTIONS
+          length_error = 1
+          OTHERS       = 2.
+      IF sy-subrc <> 0.
+        CLEAR lv_flag.
+      ENDIF.
+
+      MODIFY  lt_itab1  FROM wa_itab1.
+      IF sy-subrc = 0.
+        CLEAR lv_flag.
+      ENDIF.
+
+    ELSE.
+      lw_flag = abap_true.
+      DELETE lt_itab1.
+    ENDIF.
+
+
+  ENDLOOP.
+
+  IF lt_itab1 IS INITIAL.
+    IF lw_flag = abap_true.
+      MESSAGE TEXT-m01
+      TYPE 'E'
+      DISPLAY LIKE 'I'.
+    ENDIF.
+  ENDIF.
+**
+  IF lt_itab1 IS NOT INITIAL.
+    SELECT kostl prctr FROM csks INTO TABLE it_csks
+      FOR ALL ENTRIES IN  lt_itab1
+      WHERE kostl =  lt_itab1-kostl
+      AND kokrs = c_kokrs. "'1000' .
+
+    IF sy-subrc = 0.
+      CLEAR lv_flag.
+    ENDIF.
+
+    SELECT pspnr prctr FROM prps INTO TABLE it_prps
+      FOR ALL ENTRIES IN  lt_itab1
+* Replace Start By Shital W. On 05.12.2024
+*      WHERE pspnr =  lt_itab1-posid .
+      WHERE posid = lt_itab1-posid.
+* Replace End By Shital W. On 05.12.2024
+    IF sy-subrc = 0.
+      CLEAR lv_flag.
+    ENDIF.
+    SELECT aufnr prctr FROM aufk INTO TABLE it_aufk
+      FOR ALL ENTRIES IN  lt_itab1
+      WHERE aufnr =  lt_itab1-aufnr.
+    IF sy-subrc = 0.
+      CLEAR lv_flag.
+    ENDIF.
+    SELECT matnr werks prctr FROM marc INTO TABLE it_marc
+      FOR ALL ENTRIES IN lt_itab1
+      WHERE matnr = lt_itab1-artnr
+      AND werks  = lt_itab1-werks.
+    IF sy-subrc = 0.
+      CLEAR lv_flag.
+    ENDIF.
+    SELECT j_1bbranch werks FROM t001w
+      INTO TABLE it_t001w .
+    IF sy-subrc = 0.
+      CLEAR lv_flag.
+    ENDIF.
+
+    SELECT matnr, bwkey, bwtar, bwtty
+      FROM mbew INTO TABLE @DATA(lt_mbew)
+       FOR ALL ENTRIES IN @lt_itab1
+     WHERE matnr = @lt_itab1-artnr
+       AND bwkey = @lt_itab1-werks.
+    IF sy-subrc = 0.
+      SORT lt_mbew BY matnr bwkey bwtar.
+    ENDIF.
+
+  ENDIF.
+
+  LOOP AT lt_itab INTO ls_itab.
+    DATA(lv_tabix) = sy-tabix.
+    CLEAR: wa_documentheader, lv_item, lv_item1, lv_item2, lw_err_flag.
+
+    REFRESH : it_accgl,
+              it_curramt,
+              it_extension2,
+              it_paymentcard,
+              it_acc_rec ,
+              it_accountwt,
+              it_acc_pay,
+              it_criteria,
+              it_accountwt,
+              it_acc_tax.
+
+    PERFORM fill_header_data.
+*/--BOC by 30036195 on 22/11/2024
+    CLEAR lt_t001.
+    IF lt_itab1 IS NOT INITIAL.
+      SELECT bukrs waers FROM t001 INTO TABLE lt_t001
+        FOR ALL ENTRIES IN lt_itab1
+         WHERE bukrs = lt_itab1-bukrs.
+    ENDIF.
+*/--EOC by 30036195 on 22/11/2024
+
+    LOOP AT lt_itab1 INTO ls_itab1 WHERE serial_no = ls_itab-serial_no. "#EC CI_NESTED
+
+      IF ls_itab1-hkont IS  NOT INITIAL.
+        READ TABLE it_values INTO DATA(wa_values) WITH KEY from = ls_itab1-hkont.
+        IF sy-subrc  = 0.
+          IF ls_itab1-artnr IS INITIAL OR
+             ls_itab1-werks IS INITIAL OR
+             ls_itab1-kmvkbu IS INITIAL.
+
+            lw_err_flag = abap_true.
+
+            CLEAR msg1.
+            CONCATENATE TEXT-c01 ls_itab-serial_no
+            INTO msg1 SEPARATED BY space.
+            wa_bapiret1-type          = 'E'.
+            wa_bapiret1-id            = c_bapiid. "'ZFI_VAL'.
+            wa_bapiret1-number        = c_bapino. "'32'.
+            wa_bapiret1-message_v2   =  msg1.
+            APPEND wa_bapiret1 TO it_bapiret2.
+            CLEAR wa_bapiret1.
+            CONTINUE.
+          ENDIF.
+        ENDIF.
+      ENDIF.
+
+      IF ls_itab1-hkont IS NOT INITIAL.
+        DATA(saknr) = |{ ls_itab1-hkont ALPHA = IN }|.
+        SELECT SINGLE fstag FROM skb1  "#EC CI_DB_OPERATION_OK[2431747]
+          WHERE bukrs = @ls_itab1-bukrs
+          AND saknr =  @saknr
+          INTO @DATA(fstag).
+        IF sy-subrc EQ 0  .
+
+          IF fstag EQ c_fstag AND ( ls_itab1-artnr IS NOT INITIAL
+            OR ls_itab1-werks IS NOT INITIAL
+            OR ls_itab1-kmvkbu IS NOT INITIAL OR
+            ls_itab1-kndnr IS NOT INITIAL
+            OR ls_itab1-charg IS NOT INITIAL
+            OR ls_itab1-co_prctr IS NOT INITIAL
+            OR ls_itab1-vtweg IS NOT INITIAL ).
+            lw_err_flag = abap_true.
+            CLEAR msg1.
+            CONCATENATE ls_itab1-serial_no TEXT-057 INTO DATA(lv_message).
+            CONCATENATE TEXT-c01 lv_message INTO msg1 SEPARATED BY space.
+            wa_bapiret1-type          = 'E'.
+            wa_bapiret1-id            = c_bapiid. "'ZFI_VAL'.
+            wa_bapiret1-number        = c_bapino_34. "'34'.
+            wa_bapiret1-message_v1   =  msg1.
+            APPEND wa_bapiret1 TO it_bapiret2.
+            CLEAR wa_bapiret1.
+          ENDIF.
+        ENDIF.
+
+      ENDIF.
+
+      IF ls_itab1-lifnr IS INITIAL AND ls_itab1-kunnr IS INITIAL.
+        PERFORM fill_accgl.
+      ELSEIF  ls_itab1-kunnr  IS  NOT INITIAL.
+        PERFORM  fill_acc_rec.
+      ELSEIF ls_itab1-lifnr IS NOT INITIAL.
+        PERFORM fill_acc_pay.
+      ENDIF.
+      IF ls_itab1-mwskz IS NOT INITIAL.
+        PERFORM cal_tax.
+      ENDIF.
+
+      IF ls_itab1-qbshb IS NOT INITIAL AND  ls_itab1-qbshb1 IS NOT INITIAL.
+        PERFORM fill_accountwt. " FILL
+      ENDIF.
+      PERFORM fill_curramt.
+      PERFORM fill_extension2.
+
+      IF ls_itab1-capind IS NOT INITIAL.
+        capid = ls_itab1-capind.
+      ENDIF.
+
+      IF ls_itab1-artnr IS NOT INITIAL OR  ls_itab1-werks IS NOT INITIAL OR ls_itab1-kmvkbu IS NOT  INITIAL
+          OR   ls_itab1-kndnr IS NOT  INITIAL  OR ls_itab1-charg IS NOT INITIAL OR ls_itab1-co_prctr IS NOT INITIAL.
+        PERFORM fill_criteria.   " FILL COPA SEGEMENT
+      ENDIF.
+      REFRESH t_xkomv2 .
+      t_xkomv2 = t_xkomv1.
+      SORT t_xkomv1  BY kvsl1.                         "#EC CI_SORTLOOP
+      DELETE t_xkomv1 WHERE kvsl1 IS INITIAL.
+      DATA(item) = ls_itab1.
+      AT LAST.
+
+        LOOP AT t_xkomv1 INTO DATA(ls_komp).             "#EC CI_NESTED
+          lv_item = lv_item + 1.
+          wa_acc_tax-itemno_acc = lv_item.
+          SELECT SINGLE konts FROM j_1it030k  INTO  wa_acc_tax-gl_account "#EC CI_NESTED
+                                    WHERE ktopl = c_ktopl
+                                    AND   ktosl = ls_komp-kvsl1
+                                    AND   mwskz = ls_komp-mwsk1
+                                    AND   bupla = item-bupla.
+          IF sy-subrc  = 0.
+            CLEAR lv_flag.
+          ENDIF.
+
+          wa_acc_tax-tax_code = |{ ls_komp-mwsk1 ALPHA = IN }|.
+          wa_acc_tax-cond_key = ls_komp-kschl.
+          wa_acc_tax-acct_key = ls_komp-kvsl1.
+          wa_acc_tax-itemno_tax = ls_komp-kposn.
+          wa_acc_tax-direct_tax = abap_true.
+          wa_acc_tax-tax_rate = ls_komp-kbetr / 10.
+
+          APPEND wa_acc_tax TO it_acc_tax.
+          CLEAR wa_acc_tax.
+
+
+          wa_curramt-itemno_acc =  lv_item.
+          wa_curramt-currency   =  ls_itab-waers.
+
+          wa_curramt-curr_type  = c_curtp00.
+          wa_curramt-amt_doccur = ls_komp-kwert.
+          wa_curramt-tax_amt = ls_komp-kwert.
+          READ TABLE t_xkomv1 INTO DATA(ls_data4) WITH  KEY kposn =  ls_komp-kposn.
+          IF sy-subrc = 0 .
+            wa_curramt-amt_base = ls_data4-kawrt.
+          ENDIF.
+
+
+          APPEND wa_curramt TO it_curramt.
+          CLEAR  wa_curramt.
+
+
+*          wa_curramt-itemno_acc =  lv_item.
+*          wa_curramt-currency   =  c_currency.
+*
+*          wa_curramt-curr_type  = c_curtp10.
+*          wa_curramt-amt_doccur = ls_komp-kwert.
+*          wa_curramt-tax_amt = ls_komp-kwert.
+*          READ TABLE t_xkomv1 INTO ls_data4 WITH  KEY kposn =  ls_komp-kposn.
+*          IF sy-subrc = 0 .
+*            wa_curramt-amt_base = ls_data4-kawrt.
+*          ENDIF.
+*
+*
+*
+*          APPEND wa_curramt TO it_curramt.
+*          CLEAR  wa_curramt.
+
+        ENDLOOP.
+
+      ENDAT.
+
+      CLEAR : ls_itab1.
+
+    ENDLOOP.
+    FREE  MEMORY ID c_mem_id1.
+    EXPORT capid  TO MEMORY ID c_mem_id1. " EXPORT TO  FM (ZINTERFACE_00001020)
+    CLEAR   capid.
+    IF lw_err_flag IS INITIAL.
+
+      CLEAR : lv_tcode.
+      lv_tcode = c_tcode.
+
+      FREE MEMORY ID c_mem_id2.
+      EXPORT lv_tcode FROM lv_tcode TO MEMORY ID c_mem_id2. "Used in Enhancement Implemention ZFI_BAPIEXT
+      REFRESH it_return.
+      IF p_post = abap_false.
+
+        wa_extension1-field1 = 'ABCD'.
+        APPEND wa_extension1 TO it_extension1.
+
+        CALL FUNCTION 'BAPI_ACC_DOCUMENT_CHECK'       "#EC CI_USAGE_OK[2628704]
+          EXPORTING
+            documentheader    = wa_documentheader   "#EC CI_USAGE_OK[2438131]
+          TABLES
+            accountgl         = it_accgl
+            accountreceivable = it_acc_rec
+            accountpayable    = it_acc_pay
+            accounttax        = it_acc_tax
+            currencyamount    = it_curramt
+            criteria          = it_criteria
+*           VALUEFIELD        =
+            extension1        = it_extension1
+            return            = it_return
+            paymentcard       = it_paymentcard
+*           CONTRACTITEM      =
+            extension2        = it_extension2
+*           REALESTATE        =
+            accountwt         = it_accountwt.
+
+
+        IF it_return IS NOT INITIAL.
+
+          CLEAR msg1.
+*        CONCATENATE IT_RETURN-MESSAGE(28)
+*                    'for ''SR.No'(c01) ls_itab-serial_no
+*                           INTO msg1 SEPARATED BY space.
+          LOOP AT it_return WHERE number NE c_609.       "#EC CI_NESTED
+            wa_bapiret1-type         =  it_return-type.
+            wa_bapiret1-id           = it_return-id   .
+            wa_bapiret1-number       = it_return-number.
+            wa_bapiret1-message      = it_return-message.
+            wa_bapiret1-field        = it_return-field.
+            wa_bapiret1-log_msg_no   = it_return-log_msg_no.
+            wa_bapiret1-message_v1   = it_return-message_v1.
+            wa_bapiret1-message_v2   = it_return-message_v2.
+            wa_bapiret1-message_v3   = it_return-message_v3.
+            wa_bapiret1-parameter    = it_return-parameter.
+            wa_bapiret1-row    = it_return-row.
+            wa_bapiret1-system    = it_return-system.
+
+            CONCATENATE 'SR.No'(c01) ls_itab-serial_no
+              INTO wa_bapiret1-log_no SEPARATED BY space..
+            APPEND wa_bapiret1 TO it_bapiret2.
+
+            CLEAR wa_bapiret1.
+
+          ENDLOOP.
+
+        ENDIF.
+      ENDIF.
+      READ TABLE it_return WITH KEY type = 'E'.
+      IF sy-subrc <> 0 AND p_post = abap_true.
+        FREE MEMORY ID c_mem_id2.
+        EXPORT lv_tcode FROM lv_tcode TO MEMORY ID c_mem_id2. "Used in Enhancement Implemention ZFI_BAPIEXT
+* Posting Account Document for Released Doc
+        REFRESH : it_return ,it_bapiret1.
+
+        wa_extension1-field1 = 'ABCD'.
+        APPEND wa_extension1 TO it_extension1.
+
+        CALL FUNCTION 'BAPI_ACC_DOCUMENT_POST'         "#EC CI_USAGE_OK[2438131]
+          EXPORTING
+            documentheader    = wa_documentheader           "#EC CI_USAGE_OK[2628704]
+          TABLES
+            accountgl         = it_accgl
+            accountreceivable = it_acc_rec
+            accountpayable    = it_acc_pay
+            accounttax        = it_acc_tax
+            currencyamount    = it_curramt
+            criteria          = it_criteria
+*           VALUEFIELD        =
+            extension1        = it_extension1
+            return            = it_return
+            paymentcard       = it_paymentcard
+*           CONTRACTITEM      =
+            extension2        = it_extension2
+*           REALESTATE        =
+            accountwt         = it_accountwt.
+
+        READ TABLE it_return  WITH KEY type = 'E'.
+
+        IF sy-subrc NE 0.
+          CALL FUNCTION 'BAPI_TRANSACTION_COMMIT'
+            EXPORTING
+              wait = 'X'.
+        ELSE.
+          CALL FUNCTION 'BAPI_TRANSACTION_ROLLBACK'
+*       IMPORTING
+*         RETURN        =
+            .
+        ENDIF.
+        FREE  MEMORY ID c_mem_id1.
+
+        LOOP AT it_return WHERE number NE c_609.         "#EC CI_NESTED
+          CLEAR msg1.
+          CONCATENATE it_return-message(30)
+                      it_return-message_v2+0(10) INTO msg1
+                      SEPARATED BY space.
+          IF it_return-number = c_605.
+            wa_bapiret1-type          = 'S'.
+            wa_bapiret1-id            = c_bapiid. "'ZFI_VAL'.
+            wa_bapiret1-number        = c_bapino_29. "'29'.
+            wa_bapiret1-message       = msg1.
+            wa_bapiret1-field        = it_return-field.
+            wa_bapiret1-log_msg_no   = it_return-log_msg_no.
+            wa_bapiret1-message_v1   = it_return-message_v1.
+            wa_bapiret1-message_v2   = it_return-message_v2.
+            wa_bapiret1-message_v3   = it_return-message_v3.
+            wa_bapiret1-parameter    = it_return-parameter.
+            wa_bapiret1-row          = it_return-row.
+            wa_bapiret1-system       = it_return-system.
+            CONCATENATE 'SR.No'(c01) ls_itab-serial_no
+              INTO wa_bapiret1-log_no SEPARATED BY space..
+            APPEND wa_bapiret1 TO it_bapiret2.
+            CLEAR wa_bapiret1.
+
+          ELSE.
+            wa_bapiret1-type         =  it_return-type.
+            wa_bapiret1-id           = it_return-id   .
+            wa_bapiret1-number       = it_return-number.
+            wa_bapiret1-message      = it_return-message.
+            wa_bapiret1-field        = it_return-field.
+            wa_bapiret1-log_msg_no   = it_return-log_msg_no.
+            wa_bapiret1-message_v1   = it_return-message_v1.
+            wa_bapiret1-message_v2   = it_return-message_v2.
+            wa_bapiret1-message_v3   = it_return-message_v3.
+            wa_bapiret1-parameter    = it_return-parameter.
+            wa_bapiret1-row    = it_return-row.
+            wa_bapiret1-system    = it_return-system.
+
+            CONCATENATE 'SR.No'(c01) ls_itab-serial_no
+              INTO wa_bapiret1-log_no SEPARATED BY space..
+            APPEND wa_bapiret1 TO it_bapiret2.
+            CLEAR wa_bapiret1.
+          ENDIF.
+*          IF v_param4 = sy-uname AND
+          IF   it_return-type EQ 'S'.
+* Update zfi_dm
+*            IF it_acc_rec IS INITIAL AND it_acc_pay IS INITIAL.
+*              wa_zfi_dm-migration_object = c_mig_obj1.
+*            ELSEIF  it_acc_pay IS NOT INITIAL.
+*              wa_zfi_dm-migration_object = c_mig_obj2.
+*            ELSEIF  it_acc_rec IS NOT   INITIAL.
+*              wa_zfi_dm-migration_object = c_mig_obj3.
+*            ENDIF.
+*
+*            wa_zfi_dm-source_document = ls_itab-ccnum.
+**          SPLIT  it_return-message_v2 AT it_return-message_v2(+10) INTO DATA(lv_belnr) DATA(lv_gjahr) .
+*            DATA(lv_belnr) = it_return-message_v2(10).
+*            DATA(lv_gjahr) = it_return-message_v2+14(4).
+*            CONCATENATE ls_itab-bukrs lv_belnr lv_gjahr INTO wa_zfi_dm-target_document SEPARATED BY c_slash.
+*            wa_zfi_dm-created_by = sy-uname.
+*            wa_zfi_dm-created_on = sy-datum.
+*            wa_zfi_dm-created_at = sy-uzeit.
+*
+*            APPEND wa_zfi_dm TO it_zfi_dm.
+          ENDIF.
+*          CLEAR : wa_zfi_dm.
+        ENDLOOP.
+      ENDIF.
+    ENDIF.
+*      ENDLOOP.
+
+    DELETE lt_itab INDEX lv_tabix.
+    DELETE lt_itab1 WHERE serial_no = ls_itab-serial_no.
+
+    CLEAR lv_tabix.
+    REFRESH : it_return.
+
+    CLEAR:it_accgl,it_curramt,it_return, lw_err_flag,i_taxcom, wa_extension1, it_extension1.
+    REFRESH :  it_acc_tax,it_accgl,it_acc_pay,it_acc_rec,t_xkomv,t_xkomv1,t_xkomv2,it_extension2,it_accountwt,it_paymentcard,it_accgl,it_criteria,it_curramt.
+
+  ENDLOOP.
+*  IF it_zfi_dm IS NOT INITIAL.
+*    MODIFY zfi_dm FROM TABLE it_zfi_dm.
+  IF sy-subrc  = 0.
+    CLEAR lv_flag.
+  ENDIF.
+*  ENDIF.
+
+
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*&      Form  DISPLAY
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM display .
+*/--Begin of comments by 30036195 on 22/11/2024
+*  DATA(lcl_app_log) = zca_cl_application_log=>get_instance( ).
+*
+*  DATA(ls_log_handle) = lcl_app_log->create_app_log_handle(
+*    EXPORTING
+*      i_object    = c_obj
+*      i_subobject = c_subobj
+*      i_tcode     = sy-tcode
+*      i_repid     = sy-cprog ).
+*
+**  IF p_post IS NOT INITIAL.
+**    REFRESH it_bapiret1.
+**    it_bapiret1[] = it_bapiret2.
+**
+**  ENDIF.
+*
+*  CALL METHOD lcl_app_log->add_message_to_app_log
+*    EXPORTING
+*      i_log_handle = ls_log_handle
+*      i_tab_return = it_bapiret2.
+*
+*  CALL METHOD lcl_app_log->save_and_display_app_log
+*    EXPORTING
+*      i_log_handle = ls_log_handle
+*      i_flg_save   = abap_false.
+*/--End of comments by 30036195 on 22/11/2024
+*/--BOC by 30036195 on 22/11/2024
+  DATA:lr_table   TYPE REF TO cl_salv_table,
+       lo_cols    TYPE REF TO cl_salv_columns,
+       lo_column  TYPE REF TO cl_salv_column,
+       lo_columns TYPE REF TO cl_salv_columns_table.
+  TRY.
+      CALL METHOD cl_salv_table=>factory
+        IMPORTING
+          r_salv_table = lr_table
+        CHANGING
+          t_table      = it_bapiret2.
+
+    CATCH cx_salv_msg.
+  ENDTRY.
+  " Get column settings
+  lo_columns = lr_table->get_columns( ).
+
+  " Optimize column widths
+  lo_columns->set_optimize( abap_true ).
+* modify individual properties
+*    lo_cols = lr_table->get_columns( ).
+*    TRY.
+*        lo_column ?= lo_cols->get_column( lc_status ).
+*        lo_column->set_long_text( TEXT-c01 ).
+*        lo_column->set_medium_text( TEXT-c01 ).
+*        lo_column->set_short_text( TEXT-c01 ).
+*        lo_column->set_output_length( 10 ).
+*      CATCH cx_salv_not_found.
+*    ENDTRY.
+*......... Display Table
+  lr_table->display( ).
+*/--EOC by 30036195 on 22/11/2024
+ENDFORM.                    " DISPLAY
+*&---------------------------------------------------------------------*
+*& Form VALIDATE_DATA
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+
+*&---------------------------------------------------------------------*
+*& Form FILL_ACCGL
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM fill_accgl .
+  lv_item = lv_item + 1.
+  wa_accgl-itemno_acc = lv_item.
+  wa_accgl-gl_account = |{ ls_itab1-hkont ALPHA = IN }|."ACCNO.
+  wa_accgl-doc_type   =  ls_itab-blart."ls_itab1-blart.
+  wa_accgl-comp_code  = ls_itab-bukrs."ls_itab1-bukrs.
+
+  wa_accgl-value_date =  ls_itab1-valut.  " value date
+  wa_accgl-quantity =  ls_itab1-menge.  " quantity
+  wa_accgl-base_uom  = ls_itab1-meins. " uom
+
+**    IF ls_itab1-SHKZG1 EQ 'H'.
+  wa_accgl-profit_ctr = |{ ls_itab1-prctr ALPHA = IN }|.  "ls_itab1-KOSTL.
+  wa_accgl-bus_area = ls_itab1-gsber.
+**    ELSE.
+  wa_accgl-costcenter = |{ ls_itab1-kostl ALPHA = IN }|.
+**    ENDIF.
+  IF ls_itab1-pspnr IS NOT INITIAL.
+    CALL FUNCTION 'CONVERSION_EXIT_ABPSN_INPUT'
+      EXPORTING
+        input  = ls_itab1-pspnr
+      IMPORTING
+        output = ls_itab1-pspnr.
+
+    wa_accgl-wbs_element = ls_itab1-pspnr.
+  ENDIF.
+  wa_accgl-orderid = ls_itab1-aufnr.
+  wa_accgl-ref_key_1 = ls_itab1-xref1.
+  wa_accgl-ref_key_2 = ls_itab1-xref2.
+  wa_accgl-ref_key_3 = ls_itab1-xref3.
+  wa_accgl-alloc_nmbr = ls_itab1-zuonr.
+  wa_accgl-item_text  = ls_itab1-sgtxt.
+  wa_accgl-person_no  = ls_itab1-pernr.
+
+  wa_accgl-material_long  = ls_itab1-material_long.
+  wa_accgl-material  = |{ ls_itab1-material_long ALPHA = OUT }|.
+  wa_accgl-plant  = ls_itab1-plant.
+  wa_accgl-val_type  = ls_itab1-val_type.
+  wa_accgl-cs_trans_t  = ls_itab1-bewar.  """transaction type ey_abap
+
+  IF ls_itab1-mwskz IS NOT INITIAL.
+    wa_accgl-tax_code = |{ ls_itab1-mwskz ALPHA = IN }|.
+    wa_accgl-itemno_tax = lv_item.
+  ENDIF.
+
+  IF ls_itab1-bewar IS NOT INITIAL.
+    wa_accgl-cs_trans_t = ls_itab1-bewar.
+  ENDIF.
+
+  IF ls_itab1-vbund IS NOT INITIAL.
+    wa_accgl-trade_id = ls_itab1-vbund.
+  ENDIF.
+
+  IF ls_itab1-hsn_sac IS NOT INITIAL.
+    wa_extension2-structure = 'ACCOUNTGL'.
+    wa_extension2-valuepart1 = lv_item.
+    wa_extension2-valuepart2 = 'HSN_SAC'.
+    wa_extension2-valuepart3 = ls_itab1-hsn_sac.
+  ENDIF.
+  IF wa_extension2 IS NOT INITIAL.
+    APPEND wa_extension2 TO it_extension2.
+    CLEAR : wa_extension2.
+  ENDIF.
+  APPEND wa_accgl TO it_accgl.
+  CLEAR  wa_accgl.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form FILL_CURRAMT
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM fill_curramt .
+  IF lv_item IS INITIAL.
+    lv_item = lv_item + 1.
+  ENDIF.
+
+*  if ls_itab1-mwskz is INITIAL.
+
+  wa_curramt-itemno_acc =  lv_item.
+  wa_curramt-currency   =  ls_itab-waers.
+
+  wa_curramt-curr_type  = c_curtp00.
+  wa_curramt-exch_rate  = ls_itab1-kursf.
+  wa_curramt-amt_doccur = ls_itab1-wrbtr.
+*  IF ls_.
+*
+*  ENDIF.
+
+  APPEND wa_curramt TO it_curramt.
+  CLEAR  wa_curramt.
+*/--Begin of comments by 30036195 on 22/11/2024
+*  wa_curramt-itemno_acc =  lv_item.
+*  wa_curramt-curr_type = c_curtp10.
+*  wa_curramt-currency   = c_currency.
+*  wa_curramt-amt_doccur = ls_itab1-dmbtr.
+*
+*
+*
+*
+*
+****************************************************************************************************
+*
+*  APPEND wa_curramt TO it_curramt.
+*  CLEAR  wa_curramt.
+*/--End of comments by 30036195 on 22/11/2024
+
+*/--BOC by 30036195 on 22/11/2024
+  TRY.
+      DATA(lwt001) = lt_t001[ bukrs = ls_itab1-bukrs ].
+    CATCH cx_sy_itab_line_not_found.
+  ENDTRY.
+  IF lwt001 IS NOT INITIAL.
+    IF ls_itab1-dmbtr IS NOT INITIAL.
+      wa_curramt-itemno_acc =  lv_item.
+      wa_curramt-curr_type  = c_curtp10.
+      wa_curramt-currency   = lwt001-waers.
+      wa_curramt-amt_doccur = ls_itab1-dmbtr.
+      APPEND wa_curramt TO it_curramt.
+      CLEAR  wa_curramt.
+    ENDIF.
+  ENDIF.
+*/--EOC by 30036195 on 22/11/2024
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form FILL_EXTENSION2
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM fill_extension2 .
+  wa_extension2-structure = c_struct.
+  wa_extension2-valuepart1+0(10) = lv_item.
+  wa_extension2-valuepart1+10(1) = space.
+  wa_extension2-valuepart1+11(1) = space.
+  wa_extension2-valuepart1+12(38) = ls_itab1-xblnr_alt.
+  wa_extension2-valuepart1+38(4) = ls_itab1-bupla.
+*      wa_extension2-valuepart1 = ls_itab1-xblnr_alt.
+*      wa_extension2-valuepart2 = ls_itab1-bupla.
+
+  APPEND wa_extension2 TO it_extension2.
+  CLEAR wa_extension2.
+
+  wa_paymentcard-itemno_acc = lv_item.
+  IF  ls_itab1-kunnr IS INITIAL AND ls_itab-lifnr IS INITIAL.
+    wa_paymentcard-cc_glaccount  = ls_itab1-hkont.
+  ELSEIF ls_itab1-kunnr IS NOT INITIAL.
+    wa_paymentcard-cc_glaccount  = ls_itab1-kunnr.
+  ELSEIF ls_itab1-lifnr IS  NOT   INITIAL.
+    wa_paymentcard-cc_glaccount  = ls_itab1-lifnr.
+  ENDIF.
+  wa_paymentcard-cc_number = ls_itab1-ccnum.
+
+  APPEND wa_paymentcard TO it_paymentcard.
+  CLEAR wa_paymentcard.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form FILL_HEADER_DATA
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM fill_header_data .
+  lv_tabix  = sy-tabix.
+  l_index   = sy-tabix.
+*   Begin of chnages done by Amol on 03.06.2025
+  DATA : lv_date1 TYPE sy-datum,
+         lv_periv TYPE t009b-periv,
+         lv_buper TYPE t009b-poper,
+         lv_gjhar TYPE t009b-bdatj.
+
+  lv_periv = 'V3'.
+  lv_date1 = ls_itab-budat.
+*   End of chnages done by Amol on 03.06.2025
+
+* Header Data for Document posting
+  wa_documentheader-username    =   sy-uname.
+  wa_documentheader-comp_code   =   ls_itab-bukrs.
+
+
+* start comment on 31.8.2021
+*  IF ls_itab-budat+3(2) LE c_03.
+*    CLEAR lv_year.
+*    lv_year = ls_itab-budat+6(4) - 1.
+*    wa_documentheader-fisc_year   =   lv_year.   "sy-datum+0(4).
+*  ELSE.
+*    CLEAR lv_year.
+*    wa_documentheader-fisc_year   =   ls_itab-budat+6(4).    "SY-DATUM+0(4).
+*  ENDIF.
+*  end comment on 31.8.2021
+
+
+*Get fiscal year
+  DATA:lv_date TYPE budat.
+  CALL FUNCTION 'CONVERT_DATE_TO_INTERNAL'
+    EXPORTING
+      date_external            = ls_itab-budat
+    IMPORTING
+      date_internal            = lv_date
+    EXCEPTIONS
+      date_external_is_invalid = 1
+      OTHERS                   = 2.
+  IF sy-subrc <> 0.
+    sy-subrc = sy-subrc.
+  ENDIF.
+  CALL FUNCTION 'GET_CURRENT_YEAR'
+    EXPORTING
+      bukrs = ls_itab-bukrs
+      date  = lv_date
+    IMPORTING
+      curry = wa_documentheader-fisc_year.
+
+
+  IF ls_itab-bldat IS NOT INITIAL.
+    CONCATENATE ls_itab-bldat+6(4)  ls_itab-bldat+3(2)  ls_itab-bldat+0(2) INTO ls_itab-bldat.
+  ENDIF.
+
+  IF ls_itab-budat IS NOT INITIAL.
+    CONCATENATE ls_itab-budat+6(4)  ls_itab-budat+3(2)  ls_itab-budat+0(2) INTO ls_itab-budat.
+  ENDIF.
+
+  wa_documentheader-doc_date    =   ls_itab-bldat. " doc date
+  wa_documentheader-pstng_date  =   ls_itab-budat. " posting date
+  wa_documentheader-doc_type    =   ls_itab-blart. " doc type
+  wa_documentheader-header_txt  =   ls_itab-bktxt. " header text
+  wa_documentheader-ref_doc_no  =   ls_itab-xblnr.
+
+*   Begin of chnages done by Amol on 03.06.2025
+  CALL FUNCTION 'DATE_TO_PERIOD_CONVERT'
+    EXPORTING
+      i_date         = lv_date1
+*     I_MONMIT       = 00
+      i_periv        = lv_periv
+    IMPORTING
+      e_buper        = lv_buper
+      e_gjahr        = lv_gjhar
+    EXCEPTIONS
+      input_false    = 1
+      t009_notfound  = 2
+      t009b_notfound = 3
+      OTHERS         = 4.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+*  wa_documentheader-fis_period           =   lv_buper+1(2).
+  wa_documentheader-fis_period           =   ls_itab-fis_period.
+
+  CLEAR : lv_buper , lv_gjhar , lv_date1 .
+*   End of chnages done by Amol on 03.06.2025
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form FILL_ACC_REC
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM fill_acc_rec.
+  lv_item = lv_item + 1.
+  wa_acc_rec-itemno_acc = lv_item.
+  wa_acc_rec-customer  = |{ ls_itab1-kunnr ALPHA = IN }|. "  cust no
+  wa_acc_rec-gl_account = |{ ls_itab1-hkont1 ALPHA = IN }|. " gl ac
+  wa_acc_rec-ref_key_1  = ls_itab1-xref1.  " ref key 1
+  wa_acc_rec-ref_key_2  = ls_itab1-xref2.  " ref key 2
+  wa_acc_rec-ref_key_3  = ls_itab1-xref3.   " ref key 3
+  CONCATENATE ls_itab1-zfbdt+6(4) ls_itab1-zfbdt+3(2)  ls_itab1-zfbdt+0(2) INTO  wa_acc_rec-bline_date.
+  wa_acc_rec-bline_date =  wa_acc_rec-bline_date."ls_itab1-zfbdt. " base line date.
+  wa_acc_rec-pymt_meth  = ls_itab1-zlsch . " Paymnet method.
+  wa_acc_rec-alloc_nmbr  = ls_itab1-zuonr . " Assignment
+*  wa_acc_rec-alloc_nmbr  = ls_itab1-zuonr . " Assignment
+  wa_acc_rec-item_text  = ls_itab1-sgtxt . " ITEM_TEXT
+  wa_acc_rec-businessplace  = ls_itab1-bupla. " BUSINESSPLACE
+* Replace Start By Shital W. 02.12.2024
+*  wa_acc_rec-pmnttrms = ls_itab1-zterm . " paymetn tems
+  wa_acc_rec-pmnttrms = |{ ls_itab1-zterm ALPHA = IN }|.
+* Replace End By Shital W. 02.12.2024
+  wa_acc_rec-sectioncode  = ls_itab1-secco . "  Section Code
+  wa_acc_rec-c_ctr_area   = ls_itab1-kokrs  . "  Credit control Area .
+  wa_acc_rec-sp_gl_ind    = ls_itab1-umskz  . "  Special GL indicator.
+  wa_acc_rec-paymt_ref    = ls_itab1-paymt_ref  . "  Special GL indicator.
+  wa_acc_rec-profit_ctr = |{ ls_itab1-prctr ALPHA = IN }|.  "ls_itab1-KOSTL.
+  wa_acc_rec-bus_area = ls_itab1-gsber.
+  wa_acc_rec-bank_id     = ls_itab1-hbkid .
+  APPEND wa_acc_rec  TO it_acc_rec.
+  CLEAR wa_acc_rec.
+*
+*  if i_taxcom is NOT INITIAL.
+*     i_taxcom-kunnr = |{ ls_itab1-kunnr ALPHA = IN }|.
+*  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form FILL_ACCOUNTWT
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM fill_accountwt .
+*if ls_itab-kunnr is NOT INITIAL.
+  wa_accountwt-itemno_acc = lv_item. " LINE NO
+*ELSEIF ls_itab-lifnr is NOT INITIAL.
+*  WA_ACCOUNTWT-ITEMNO_ACC = LV_ITEM.
+
+  wa_accountwt-wt_type  =  ls_itab1-qbshb . "withholding tax typ.
+  wa_accountwt-wt_code  =  ls_itab1-qbshb1 . "withholding tax CODE.
+  wa_accountwt-bas_amt_lc   =  ls_itab1-wtbamt . " Withholding tax base amount lc
+  wa_accountwt-bas_amt_tc   =  ls_itab1-wtbamt . " Withholding tax base amount lc
+  wa_accountwt-bas_amt_ind   =  'X' . "
+
+  APPEND wa_accountwt TO   it_accountwt.
+  CLEAR wa_accountwt.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form FILL_ACC_PAY
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM fill_acc_pay .
+  lv_item = lv_item + 1.
+  wa_acc_pay-itemno_acc   = lv_item. " SR NO
+  wa_acc_pay-vendor_no    =  |{ ls_itab1-lifnr  ALPHA = IN }|." VENDOR NO
+  wa_acc_pay-gl_account = |{ ls_itab1-hkont1 ALPHA = IN }|.
+  wa_acc_pay-ref_key_1    = ls_itab1-xref1.  " ref key 1
+  wa_acc_pay-ref_key_2    = ls_itab1-xref2.  " ref key 2
+  wa_acc_pay-ref_key_3    = ls_itab1-xref3.   " ref key 3
+  CONCATENATE ls_itab1-zfbdt+6(4) ls_itab1-zfbdt+3(2)  ls_itab1-zfbdt+0(2) INTO  wa_acc_rec-bline_date.
+  wa_acc_pay-bline_date   = wa_acc_rec-bline_date." ls_itab1-zfbdt. " base line date.
+  wa_acc_pay-pymt_meth    = ls_itab1-zlsch . " Paymnet method.
+  wa_acc_pay-pmnt_block = ls_itab1-zlspr.     "Payment Block Key
+  wa_acc_pay-alloc_nmbr   = ls_itab1-zuonr . " Assignment
+*  wa_acc_pay-alloc_nmbr   = ls_itab1-zuonr . " Assignment
+  wa_acc_pay-item_text   = ls_itab1-sgtxt . " ITEM_TEXT
+  wa_acc_pay-businessplace  = ls_itab1-bupla. " BUSINESSPLACE
+  wa_acc_pay-sectioncode  = ls_itab1-secco . "  Section Code
+* Replace Start By Shital W. On 02.12.2024
+*  wa_acc_pay-pmnttrms     = ls_itab1-zterm . " payment term
+  wa_acc_pay-pmnttrms = |{ ls_itab1-zterm ALPHA = IN }|.
+* Replace End By Shital W. On 02.12.2024
+*  WA_ACC_PAY-C_CTR_AREA   = ls_itab1-KOKRS  . "  Credit control Area .
+  wa_acc_pay-sp_gl_ind    = ls_itab1-umskz  . "  Special GL indicator.
+*  wa_acc_pay-   = ls_itab1-bewar  . "  Special GL indicator.
+  wa_acc_pay-paymt_ref    = ls_itab1-paymt_ref  . "  Special GL indicator.
+  wa_acc_pay-profit_ctr = |{ ls_itab1-prctr ALPHA = IN }|.  "ls_itab1-KOSTL.
+  wa_acc_pay-bus_area = ls_itab1-gsber.
+  wa_acc_pay-bank_id     = ls_itab1-hbkid .
+  APPEND wa_acc_pay  TO it_acc_pay.
+  CLEAR wa_acc_pay.
+
+*  if i_taxcom is NOT INITIAL.
+*    i_taxcom-lifnr = |{ ls_itab1-lifnr  ALPHA = IN }|." VENDOR NO
+*  ENDIF.
+
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form DOWNLOAD
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM download .
+  FREE: gt_iexcel.
+  CLEAR: gw_xexcel.
+  gw_xexcel-fld39 =   TEXT-039.
+  gw_xexcel-fld1  =   TEXT-001.
+  gw_xexcel-fld2  =   TEXT-002.
+  gw_xexcel-fld3  =   TEXT-003.
+  gw_xexcel-fld4  =   TEXT-004.
+  gw_xexcel-fld5  =   TEXT-005.
+  gw_xexcel-fld6  =   TEXT-006.
+  gw_xexcel-fld7  =   TEXT-007.
+  gw_xexcel-fld8  =   TEXT-008.
+  gw_xexcel-fld9  =   TEXT-009.
+  gw_xexcel-fld10 =   TEXT-010.
+  gw_xexcel-fld11	=	  TEXT-011.
+  gw_xexcel-fld12	=	  TEXT-012.
+*  gw_xexcel-fld57 =   TEXT-058.
+  gw_xexcel-fld13	=	  TEXT-013.
+  gw_xexcel-fld14	=	  TEXT-014.
+  gw_xexcel-fld15	=	  TEXT-015.
+  gw_xexcel-fld16	=	  TEXT-016.
+  gw_xexcel-fld17	=	  TEXT-017.
+  gw_xexcel-fld18	=	  TEXT-018.
+  gw_xexcel-fld19	=	  TEXT-019.
+  gw_xexcel-fld20	=	  TEXT-020.
+  gw_xexcel-fld21	=	  TEXT-021.
+  gw_xexcel-fld22	=	  TEXT-022.
+  gw_xexcel-fld23	=	  TEXT-023.
+  gw_xexcel-fld24	=	  TEXT-024.
+  gw_xexcel-fld25	=	  TEXT-025.
+  gw_xexcel-fld26	=	  TEXT-026.
+  gw_xexcel-fld27	=	  TEXT-027.
+  gw_xexcel-fld28	=	  TEXT-028.
+  gw_xexcel-fld29	=	  TEXT-029.
+  gw_xexcel-fld30	=	  TEXT-030.
+  gw_xexcel-fld31	=	  TEXT-031.
+  gw_xexcel-fld32	=	  TEXT-032.
+  gw_xexcel-fld33	=	  TEXT-033.
+  gw_xexcel-fld34	=	  TEXT-034.
+  gw_xexcel-fld35	=	  TEXT-035.
+  gw_xexcel-fld36	=	  TEXT-036.
+  gw_xexcel-fld37	=	  TEXT-037.
+  gw_xexcel-fld38	=	  TEXT-038.
+  gw_xexcel-fld39	=	  TEXT-039.
+  gw_xexcel-fld40	=	  TEXT-040.
+  gw_xexcel-fld41 =   TEXT-041.
+  gw_xexcel-fld42	=	  TEXT-042.
+  gw_xexcel-fld43	=	  TEXT-043. " COPA BATCH
+* Insert Start By Shital W. On 28.12.2023
+  gw_xexcel-fld60 =   TEXT-061. " Sales Org
+  gw_xexcel-fld61 =   TEXT-062. " Country Code
+  gw_xexcel-fld62 =   TEXT-063. " Sales Type
+* Insert End By Shital W. On 28.12.2023
+  gw_xexcel-fld55 =   TEXT-055. " copa profit center
+  gw_xexcel-fld56 =   TEXT-056. " Distribution Channel
+  gw_xexcel-fld44	=	  TEXT-044.
+  gw_xexcel-fld45	=	  TEXT-045.
+  gw_xexcel-fld46	=	  TEXT-054.
+  gw_xexcel-fld47  =   TEXT-046.
+  gw_xexcel-fld48  =   TEXT-047.
+  gw_xexcel-fld49  =   TEXT-048.
+  gw_xexcel-fld50  =   TEXT-049.
+  gw_xexcel-fld51  =   TEXT-050.
+  gw_xexcel-fld52  =   TEXT-051.
+  gw_xexcel-fld53  =   TEXT-052.
+  gw_xexcel-fld54  =   TEXT-053.
+*  gw_xexcel-fld58  =   TEXT-059.
+*  gw_xexcel-fld59  =   TEXT-060.
+* Insert Start By Shital W. On 05.12.2024
+  gw_xexcel-fld63  =   TEXT-064. " WBS
+* Insert End By Shital W. On 05.12.2024
+  gw_xexcel-fld64  =   TEXT-065. " WBS
+  APPEND gw_xexcel TO gt_iexcel.
+  CLEAR: gw_xexcel.
+
+
+  DATA p_file1 TYPE string.
+  p_file1 =  p_file.
+  IF p_file1 CP c_xlsx.
+
+  ELSE.
+    CONCATENATE p_file1 c_xls INTO p_file1 .
+  ENDIF.
+  CALL FUNCTION 'GUI_DOWNLOAD'
+    EXPORTING
+*     BIN_FILESIZE            =
+      filename                = p_file1
+*     FILETYPE                =
+*     APPEND                  = ' '
+      write_field_separator   = 'X'
+*     HEADER                  = '00'
+*     TRUNC_TRAILING_BLANKS   = ' '
+*     WRITE_LF                = 'X'
+*     COL_SELECT              = ' '
+*     COL_SELECT_MASK         = ' '
+*     DAT_MODE                = ' '
+      confirm_overwrite       = 'X'
+*     NO_AUTH_CHECK           = ' '
+*     CODEPAGE                = ' '
+*     IGNORE_CERR             = ABAP_TRUE
+*     REPLACEMENT             = '#'
+*     WRITE_BOM               = ' '
+*     TRUNC_TRAILING_BLANKS_EOL       = zcl_constant_declaration=>gc_x
+*     WK1_N_FORMAT            = ' '
+*     WK1_N_SIZE              = ' '
+*     WK1_T_FORMAT            = ' '
+*     WK1_T_SIZE              = ' '
+*     WRITE_LF_AFTER_LAST_LINE        = ABAP_TRUE
+*     SHOW_TRANSFER_STATUS    = ABAP_TRUE
+*     VIRUS_SCAN_PROFILE      = '/SCET/GUI_DOWNLOAD'
+* IMPORTING
+*     FILELENGTH              =
+    TABLES
+      data_tab                = gt_iexcel
+*     FIELDNAMES              =
+    EXCEPTIONS
+      file_write_error        = 1
+      no_batch                = 2
+      gui_refuse_filetransfer = 3
+      invalid_type            = 4
+      no_authority            = 5
+      unknown_error           = 6
+      header_not_allowed      = 7
+      separator_not_allowed   = 8
+      filesize_not_allowed    = 9
+      header_too_long         = 10
+      dp_error_create         = 11
+      dp_error_send           = 12
+      dp_error_write          = 13
+      unknown_dp_error        = 14
+      access_denied           = 15
+      dp_out_of_memory        = 16
+      disk_full               = 17
+      dp_timeout              = 18
+      file_not_found          = 19
+      dataprovider_exception  = 20
+      control_flush_error     = 21
+      OTHERS                  = 22.
+  IF sy-subrc <> 0.
+    MESSAGE TEXT-m03 TYPE 'I'.
+  ELSE.
+    MESSAGE TEXT-m04 TYPE 'I'.
+  ENDIF.
+
+
+
+  FREE: gt_iexcel.
+
+
+
+
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form FILL_CRITERIA
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM fill_criteria .
+*  IF ls_itab1-kmvkbu  IS NOT INITIAL.
+*       wa_criteria-itemno_acc = lv_item.
+*       wa_criteria-fieldname = c_field4. "SALES OFFICE
+*       wa_criteria-character = ls_itab1-kmvkbu.
+*       APPEND wa_criteria TO it_criteria.
+*     CLEAR wa_criteria.
+*  ENDIF.
+
+  IF  ls_itab1-artnr  IS NOT INITIAL AND ls_itab1-werks IS NOT INITIAL.
+    READ TABLE it_marc INTO DATA(wa_marc) WITH KEY matnr =  ls_itab1-artnr  werks = ls_itab1-werks.
+    IF sy-subrc = 0 .
+      wa_criteria-itemno_acc = lv_item.
+      wa_criteria-fieldname = c_field1. "profic center
+      wa_criteria-character = wa_marc-prctr.
+      APPEND wa_criteria TO it_criteria.
+      CLEAR wa_criteria.
+
+    ENDIF.
+
+  ELSEIF  ls_itab1-kostl IS  NOT INITIAL.
+
+    READ TABLE it_csks INTO DATA(wa_csks) WITH KEY kostl = ls_itab1-kostl.
+    IF sy-subrc = 0.
+      wa_criteria-itemno_acc = lv_item.
+      wa_criteria-fieldname = c_field1. "profic center
+      wa_criteria-character = wa_csks-prctr.
+      APPEND wa_criteria TO it_criteria.
+      CLEAR wa_criteria.
+
+    ENDIF.
+
+  ELSEIF ls_itab1-aufnr IS  NOT INITIAL.
+    READ TABLE it_aufk INTO DATA(wa_aufk) WITH KEY aufnr = ls_itab1-aufnr.
+    IF sy-subrc = 0.
+      wa_criteria-itemno_acc = lv_item.
+      wa_criteria-fieldname = c_field1. "profic center
+      wa_criteria-character = wa_aufk-prctr.
+      APPEND wa_criteria TO it_criteria.
+      CLEAR wa_criteria.
+
+    ENDIF.
+  ELSEIF ls_itab1-pspnr IS NOT  INITIAL.
+    READ TABLE it_prps INTO DATA(wa_prps) WITH KEY pspnr = ls_itab1-aufnr.
+    IF sy-subrc = 0.
+      wa_criteria-itemno_acc = lv_item.
+      wa_criteria-fieldname = c_field1. "profic center
+      wa_criteria-character = wa_prps-prctr.
+      APPEND wa_criteria TO it_criteria.
+      CLEAR wa_criteria.
+    ENDIF.
+
+  ENDIF.
+
+  IF ls_itab1-artnr  IS NOT INITIAL.
+    wa_criteria-itemno_acc = lv_item.
+    wa_criteria-fieldname = c_field2." PRODUCT
+    wa_criteria-character = |{ ls_itab1-artnr ALPHA = IN }|.
+    APPEND wa_criteria TO it_criteria.
+    CLEAR wa_criteria.
+  ENDIF.
+
+  IF ls_itab1-werks  IS NOT INITIAL.
+    wa_criteria-itemno_acc = lv_item.
+    wa_criteria-fieldname = c_field3." Plant
+    wa_criteria-character = ls_itab1-werks."|{ ls_itab1-werks ALPHA = IN }|.
+    APPEND wa_criteria TO it_criteria.
+    CLEAR wa_criteria.
+  ENDIF.
+
+  IF ls_itab1-kmvkbu  IS NOT INITIAL.
+    wa_criteria-itemno_acc = lv_item.
+    wa_criteria-fieldname = c_field4. "SALES OFFICE
+    wa_criteria-character = ls_itab1-kmvkbu.
+    APPEND wa_criteria TO it_criteria.
+    CLEAR wa_criteria.
+  ENDIF.
+
+  IF ls_itab1-kndnr  IS NOT INITIAL.
+    wa_criteria-itemno_acc = lv_item.
+    wa_criteria-fieldname = c_field5." custome
+    ls_itab1-kndnr = |{ ls_itab1-kndnr ALPHA = IN }|.
+    wa_criteria-character = ls_itab1-kndnr."|{ ls_itab1-KNDNR ALPHA = IN }|.
+    APPEND wa_criteria TO it_criteria.
+    CLEAR wa_criteria.
+  ENDIF.
+
+  IF ls_itab1-charg  IS NOT INITIAL.
+    wa_criteria-itemno_acc = lv_item.
+    wa_criteria-fieldname = c_field6." BATCH
+    wa_criteria-character = ls_itab1-charg." |{ ls_itab1-CHARG ALPHA = IN }|.
+    APPEND wa_criteria TO it_criteria.
+    CLEAR wa_criteria.
+  ENDIF.
+
+
+  IF ls_itab1-val_type  IS NOT INITIAL.  " valution type
+    wa_criteria-itemno_acc = lv_item.
+    wa_criteria-fieldname = c_field7." BATCH
+    wa_criteria-character = ls_itab1-val_type." Valution type
+    APPEND wa_criteria TO it_criteria.
+    CLEAR wa_criteria.
+  ENDIF.
+
+  IF ls_itab1-co_prctr IS NOT INITIAL.
+    wa_criteria-itemno_acc = lv_item.
+    wa_criteria-fieldname = c_field1. "profic center
+    ls_itab1-co_prctr =  |{ ls_itab1-co_prctr ALPHA = IN }|.
+    wa_criteria-character = ls_itab1-co_prctr .
+    APPEND wa_criteria TO it_criteria.
+    CLEAR wa_criteria.
+  ENDIF.
+
+  IF ls_itab1-vtweg IS NOT INITIAL.
+    wa_criteria-itemno_acc = lv_item.
+    wa_criteria-fieldname = c_field8. "Disctribution Channel
+*    ls_itab1-VTWEG =  |{ ls_itab1-VTWEG }|.
+    wa_criteria-character = ls_itab1-vtweg .
+    APPEND wa_criteria TO it_criteria.
+    CLEAR wa_criteria.
+  ENDIF.
+
+* Insert Start By Shital W. On 28.12.2023
+  IF ls_itab-vkorg IS NOT INITIAL.
+    wa_criteria-itemno_acc = lv_item.
+    wa_criteria-fieldname  = gc_vkorg.
+    wa_criteria-character  = ls_itab1-vkorg .
+    APPEND wa_criteria TO it_criteria.
+    CLEAR wa_criteria.
+  ENDIF. " IF ls_itab-vkorg IS NOT INITIAL.
+
+  IF ls_itab-ww106 IS NOT INITIAL.
+    wa_criteria-itemno_acc = lv_item.
+    wa_criteria-fieldname  = gc_ww106.
+    wa_criteria-character  = ls_itab1-ww106.
+    APPEND wa_criteria TO it_criteria.
+    CLEAR wa_criteria.
+  ENDIF. " IF ls_itab-ww106 IS NOT INITIAL.
+
+  IF ls_itab-land1 IS NOT INITIAL.
+    wa_criteria-itemno_acc = lv_item.
+    wa_criteria-fieldname  = gc_land1.
+    wa_criteria-character  = ls_itab1-land1.
+    APPEND wa_criteria TO it_criteria.
+    CLEAR wa_criteria.
+  ENDIF. " IF ls_itab-land1 IS NOT INITIAL.
+* Insert End By Shital W. On 28.12.2023
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form CAL_TAX
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM cal_tax .
+  CLEAR i_taxcom.
+  REFRESH : it_acc_tax, t_xkomv.
+  i_taxcom-kposn = lv_item.
+  i_taxcom-bukrs = ls_itab-bukrs.  "COMP CODE
+  i_taxcom-bldat = ls_itab-bldat. " POSTING DATE
+  i_taxcom-budat   = ls_itab-budat. " DOC DATE
+  i_taxcom-waers = ls_itab-waers. " CURRENCY
+  i_taxcom-hwaer = ls_itab-waers. " CURRENCY
+  i_taxcom-mwskz = |{ ls_itab1-mwskz ALPHA = IN }|. " TAX CODE
+  i_taxcom-wrbtr = ls_itab1-wrbtr. " DOC AMT.
+  i_taxcom-xmwst = 'X'.
+  i_taxcom-land1 = c_land1.
+  IF ls_itab1-werks IS NOT INITIAL.
+    i_taxcom-werks = ls_itab1-werks. " PLANT.
+  ELSE.
+    READ TABLE it_t001w INTO DATA(ls_t001w) WITH KEY j_1bbranch = ls_itab1-bupla.
+    IF sy-subrc = 0.
+      i_taxcom-werks  = ls_t001w-werks.
+    ENDIF.
+
+    DATA(lt_itab3) = lt_itab.
+
+    DELETE lt_itab3  WHERE lifnr IS NOT INITIAL.
+    IF lt_itab3 IS NOT INITIAL.
+      READ TABLE lt_itab3 INTO DATA(ls_data) INDEX 1.
+      IF sy-subrc = 0.
+        i_taxcom-lifnr = ls_data-lifnr.
+      ENDIF.
+    ELSE.
+      REFRESH lt_itab3.
+      lt_itab3 = lt_itab.
+      DELETE lt_itab3  WHERE kunnr IS NOT INITIAL.
+      READ TABLE lt_itab3 INTO ls_data INDEX 1.
+      IF sy-subrc = 0.
+        i_taxcom-kunnr = ls_data-kunnr.
+      ENDIF.
+    ENDIF.
+
+    CALL FUNCTION 'CALCULATE_TAX_ITEM'
+      EXPORTING
+*       ANZAHLUNG           = ' '
+*       DIALOG              = ' '
+*       DISPLAY_ONLY        = ' '
+*       INKLUSIVE           = ' '
+*       I_ANWTYP            = ' '
+*       I_DMBTR             = '0'
+*       I_MWSTS             = '0'
+        i_taxcom            = i_taxcom
+*       PRUEFEN             = ' '
+*       RESET               = ' '
+*       I_KTOSL             = ' '
+* IMPORTING
+*       E_NAVFW             =
+*       E_TAXCOM            =
+*       E_XSTVR             =
+*       NAV_ANTEIL          =
+      TABLES
+        t_xkomv             = t_xkomv
+      EXCEPTIONS
+        mwskz_not_defined   = 1
+        mwskz_not_found     = 2
+        mwskz_not_valid     = 3
+        steuerbetrag_falsch = 4
+        country_not_found   = 5
+        txjcd_not_valid     = 6
+        OTHERS              = 7.
+    IF sy-subrc <> 0.
+      CLEAR  lv_flag.
+    ENDIF.
+
+    APPEND LINES OF t_xkomv TO t_xkomv1.
+    REFRESH t_xkomv.
+
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form CAL_TAX1
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+*FORM cal_tax1 .
+*  if i_taxcom
+*
+*&---------------------------------------------------------------------*
+*& Form ERROR_DISPLAY
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM error_display .
+  IF lt_error IS NOT INITIAL.
+    CLEAR:gs_fieldcatalog,gt_fieldcatalog.
+    gs_fieldcatalog-fieldname = 'SERIAL_NO'.
+    gs_fieldcatalog-seltext_l = 'serial_no'.
+    APPEND gs_fieldcatalog TO gt_fieldcatalog.
+    CLEAR  gs_fieldcatalog.
+
+    gs_fieldcatalog-fieldname = 'BLART'.
+    gs_fieldcatalog-seltext_l = 'Document Type'.
+    APPEND gs_fieldcatalog TO gt_fieldcatalog.
+    CLEAR  gs_fieldcatalog.
+
+    gs_fieldcatalog-fieldname = 'HKONT'.
+    gs_fieldcatalog-seltext_l = 'GL Account'.
+    APPEND gs_fieldcatalog TO gt_fieldcatalog.
+    CLEAR  gs_fieldcatalog.
+
+    gs_fieldcatalog-fieldname = 'LIFNR'.
+    gs_fieldcatalog-seltext_l = 'Vendor'.
+    APPEND gs_fieldcatalog TO gt_fieldcatalog.
+    CLEAR  gs_fieldcatalog.
+
+    gs_fieldcatalog-fieldname = 'KUNNR'.
+    gs_fieldcatalog-seltext_l = 'Customer'.
+    APPEND gs_fieldcatalog TO gt_fieldcatalog.
+    CLEAR  gs_fieldcatalog.
+
+    gs_fieldcatalog-fieldname = 'MSG'.
+    gs_fieldcatalog-seltext_l = 'Message'.
+    APPEND gs_fieldcatalog TO gt_fieldcatalog.
+    CLEAR  gs_fieldcatalog.
+
+    CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+      EXPORTING
+        it_fieldcat   = gt_fieldcatalog
+      TABLES
+        t_outtab      = lt_error
+      EXCEPTIONS
+        program_error = 1
+        OTHERS        = 2.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+              WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+  ENDIF.
+ENDFORM.
