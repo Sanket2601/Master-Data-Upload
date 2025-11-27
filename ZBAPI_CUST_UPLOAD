@@ -1268,3 +1268,79 @@ FORM gst_no .
       return          = lt_return.
 
 ENDFORM.
+
+
+
+1	Serial No	9	19
+2	Comapny Code	12	22
+3	Document Date	13	23
+4	Posting Date	12	22
+5	Document Type	13	23
+6	Header Text	11	21
+7	Reference	9	19
+8	Exchange Rate	13	23
+9	Currency	8	18
+10	Alternative Reference Number	28	56
+11	Card No	7	17
+12	Special GL Indicator	20	40
+13	GL Account No	13	23
+14	Vendor Number	13	23
+15	Customer Nmber	14	24
+16	Alternative Reconciliation Account	34	68
+17	Credit Control Area	19	29
+18	Amount in LC	12	22
+19	Amount in DC	12	22
+20	Ref. key 3	10	20
+21	Baseline Date	13	23
+22	Payment Terms	13	23
+23	Value Date	10	20
+24	Assignment	10	20
+25	Material Code	13	23
+26	Plant	5	15
+27	Valuation Type	14	24
+28	Quantity	8	18
+29	UoM	3	13
+30	Text	4	14
+31	Text Code	9	19
+32	Business Place	14	24
+33	Business Area	13	23
+34	Section Code	12	22
+35	Cost Center	11	21
+36	Profit Center	13	23
+37	WBS	3	13
+38	Internal Order	14	24
+39	COPA Characteristics 1 Material Code	36	72
+40	COPA Characteristics 2 Plant Code	33	66
+41	COPA Characteristics 3 Sales Office	35	70
+42	COPA Characteristics 4 Customer Code	36	72
+43	COPA Characteristics 5 Batch	28	56
+44	Ref. key 1	10	20
+45	Ref. key 2	10	20
+46	Payment Method	14	24
+47	House Bank	10	20
+48	Payment Reference	17	27
+49	Withholding Tax Type	20	40
+50	Withholding Tax Code	20	40
+51	Withholding Tax Base Amount	27	54
+52	Personnel Number	16	26
+53	Investment ID	13	23
+54	Payment Block Key	17	27
+55	COPA Characteristics 6 Profit Center	36	40
+56	COPA Characteristics 7 Distribution Chan	40	40
+57	COPA Char. not allowed for this GL	34	68
+61	Sales Org	9	19
+62	Country Code	12	22
+63	Sales Type	10	20
+64	WBS Element	11	21
+65	Fiscal Period	13	23
+C01	SR. No	6	16
+M01	No Authorization	16	26
+M02	Please select file	18	26
+M03	Error in file download	22	44
+M04	Template Downloaded	19	29
+
+
+P_FILE	File Name
+P_POST	Post
+P_RB1	Download Template
+P_RB2	Upload File
